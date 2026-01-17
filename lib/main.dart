@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:kuafor_randevu/providers/shop_provider.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'providers/shop_provider.dart';
 import 'providers/user_provider.dart';
@@ -18,9 +18,18 @@ import 'pages/profil_page.dart';
 import 'pages/shop_detail_page.dart';
 import 'pages/shop_edit_page.dart';
 import 'pages/phone_verification_page.dart';
+import 'pages/customer_home_page.dart';
+import 'pages/customer_shop_detail_page.dart';
+import 'pages/staff_selection_page.dart';
+import 'pages/service_selection_page.dart';
+import 'pages/date_time_selection_page.dart';
+import 'pages/guest_info_page.dart';
+import 'pages/otp_verification_page.dart';
 
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('tr_TR', null);
   runApp(
     MultiProvider(
       providers: [
@@ -91,12 +100,17 @@ class _BerberAppState extends State<BerberApp> {
           bodyMedium: TextStyle(color: Colors.white),
         ),
       ),
-      home: userProvider.isLoggedIn ? const BarberHomePage() : const LoginPage(),
+      home: userProvider.isLoggedIn
+          ? (userProvider.user?.role == 'Barber'
+              ? const BarberHomePage()
+              : const CustomerHomePage())
+          : const LoginPage(),
       routes: {
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
         '/roleSelection': (context) => const RoleSelectionPage(),
         '/barberHome': (context) => const BarberHomePage(),
+        '/customerHome': (context) => const CustomerHomePage(),
         '/setAvailability': (context) => const SetAvailabilityPage(),
         '/allAppointments': (context) => const AllAppointmentsPage(),
         '/working-hours': (context) => const WorkingDaysPage(),
@@ -108,6 +122,12 @@ class _BerberAppState extends State<BerberApp> {
         '/shop_detail_page': (context) => const ShopDetailPage(),
         '/shop_edit_page': (context) => const ShopEditPage(),
         '/phone_verification_page': (context) => const PhoneVerificationPage(),
+        '/customerShopDetail': (context) => const CustomerShopDetailPage(),
+        '/staffSelection': (context) => const StaffSelectionPage(),
+        '/serviceSelection': (context) => const ServiceSelectionPage(),
+        '/dateTimeSelection': (context) => const DateTimeSelectionPage(),
+        '/guestInfo': (context) => const GuestInfoPage(),
+        '/otpVerification': (context) => const OtpVerificationPage(),
       },
     );
   }

@@ -151,6 +151,40 @@ class _LoginPageState extends State<LoginPage> {
                     style: TextStyle(color: Colors.white70),
                   ),
                 ),
+
+                const SizedBox(height: 12),
+                const Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.white24)),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Text("veya", style: TextStyle(color: Colors.white54)),
+                    ),
+                    Expanded(child: Divider(color: Colors.white24)),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                OutlinedButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/customerHome');
+                  },
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 55),
+                    side: const BorderSide(color: Color(0xFFC69749)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Randevu Al (Kayıt Olmadan)',
+                    style: TextStyle(
+                      color: Color(0xFFC69749),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

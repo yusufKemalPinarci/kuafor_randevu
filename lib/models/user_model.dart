@@ -63,7 +63,7 @@ class UserModel {
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      id: json['id'] ?? '',
+      id: json['_id'] ?? json['id'] ?? '',
       name: json['name'] ?? '',
       email: json['email'] ?? '',
       role: json['role'] ?? '',
@@ -72,9 +72,6 @@ class UserModel {
       isPhoneVerified: json['isPhoneVerified'] ?? false,
       avatarUrl: json['avatarUrl'] ?? '',
       jwtToken: json['jwtToken'] ?? '',
-     // tokenExpiry: json['tokenExpiry'] != null
-       //   ? DateTime.tryParse(json['tokenExpiry'])
-         // : null,
       shopId: json['shopId'] ?? '',
     );
   }
