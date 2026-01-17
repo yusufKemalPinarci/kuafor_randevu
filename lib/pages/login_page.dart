@@ -1,10 +1,9 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import '../core/constants.dart';
 import '../models/user_model.dart';
 import '../providers/user_provider.dart';
 
@@ -22,6 +21,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
 
   void _showMessage(String text) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(text)),
     );
@@ -40,11 +40,10 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final response = await http.post(
-        Uri.parse('https://node-js-api-8m2g.onrender.com/api/user/login'),
+        Uri.parse('${AppConstants.baseUrl}/api/user/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
       );
-
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -57,31 +56,25 @@ class _LoginPageState extends State<LoginPage> {
           'tokenExpiry': DateTime.now().add(const Duration(hours: 1)).toIso8601String(),
         });
 
-        /*
-        // Provider'a aktar
-        final userProvider = Provider.of<UserProvider>(context, listen: false);
-        userProvider.setUser(user);
-
-        // SharedPreferences'e kaydet
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user', jsonEncode(user.toJson()));*/
+        if (!mounted) return;
         final userProvider = Provider.of<UserProvider>(context, listen: false);
         await userProvider.saveUserToLocal(user);
 
-        // Başarılı yönlendirme
+        if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/barberHome');
       } else {
         final error = jsonDecode(response.body);
         _showMessage(error['error'] ?? 'Giriş başarısız.');
         print(error);
-
       }
     } catch (e) {
       _showMessage("Hata oluştu: $e");
       print("hata");
       print("$e");
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

@@ -45,6 +45,7 @@ class _WorkingDaysPageState extends State<WorkingDaysPage> {
       initialTime: TimeOfDay(hour: 9, minute: 0),
     );
     if (start == null) return;
+    if (!mounted) return;
 
     final TimeOfDay? end = await showTimePicker(
       context: context,

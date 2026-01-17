@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:kuafor_randevu/models/user_model.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../providers/user_provider.dart';
+import '../services/user_service.dart';
 
 class ShopDetailPage extends StatefulWidget {
   const ShopDetailPage({super.key});
@@ -156,11 +159,39 @@ class _ShopDetailPageState extends State<ShopDetailPage> {
           ),
           TextButton(
             child: const Text('Ayrıl', style: TextStyle(color: Colors.red)),
-            onPressed: () {
-              Navigator.pop(context);
-              // Buraya dükkan ayrılma API isteğini ekle
-              Navigator.pushReplacementNamed(context, '/profile_page');
-            },
+              onPressed: () async {
+                final userProvider = Provider.of<UserProvider>(context, listen: false);
+                final user = userProvider.user;
+
+                if (user == null || user.jwtToken == null) {
+                  print("Token yok veya kullanıcı giriş yapmamış.");
+                  return;
+                }
+
+                final userService = UserService(baseUrl: 'https://node-js-api-8m2g.onrender.com');
+
+                final updatedUserFromApi = await userService.leaveShop(user.jwtToken!);
+
+                if (updatedUserFromApi == null) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Dükkandan ayrılma başarısız oldu")),
+                  );
+                  return;
+                }
+
+                // Provider'ı güncelle
+                userProvider.setUser(updatedUserFromApi as UserModel);
+
+                // SharedPreferences güncelle
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove('selectedShop');
+
+                if (!mounted) return;
+                Navigator.pop(context);
+                Navigator.pushReplacementNamed(context, '/profile_page');
+              },
+
           ),
         ],
       ),

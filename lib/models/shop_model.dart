@@ -3,14 +3,15 @@ class ShopModel {
   final String name;
   final String fullAddress;
   final String neighborhood;
-  final String city;
+  final String city; // province name olacak
   final String? phone;
-  final String? adress;
+  final String? adress; // eski alan korunuyor ama fullAddress ile aynı olabilir
+  final String? district;      // district name
   final String openingHour;
   final String closingHour;
   final List<String> workingDays;
-  final String ownerId;             // Dükkan sahibinin kullanıcı ID’si
-  final List<String> staffEmails;   // Çalışanların mail adresleri
+  final String ownerId;
+  final List<String> staffEmails;
 
   ShopModel({
     required this.id,
@@ -20,6 +21,7 @@ class ShopModel {
     required this.city,
     this.phone,
     this.adress,
+    this.district,
     required this.openingHour,
     required this.closingHour,
     required this.workingDays,
@@ -36,6 +38,7 @@ class ShopModel {
       city: json['city'] ?? '',
       phone: json['phone'],
       adress: json['adress'],
+      district: json['district'],
       openingHour: json['openingHour'] ?? '',
       closingHour: json['closingHour'] ?? '',
       workingDays: List<String>.from(json['workingDays'] ?? []),
@@ -53,6 +56,7 @@ class ShopModel {
       'city': city,
       'phone': phone,
       'adress': adress,
+      'district': district,
       'openingHour': openingHour,
       'closingHour': closingHour,
       'workingDays': workingDays,

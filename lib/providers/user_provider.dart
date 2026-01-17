@@ -1,15 +1,19 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../models/user_model.dart';
+
+
 
 class UserProvider extends ChangeNotifier {
   UserModel? _user;
 
   UserModel? get user => _user;
 
-  bool get isLoggedIn => _user != null; //&& _user!.isTokenValid;
+  bool get isLoggedIn => _user != null && _user!.isTokenValid;
+
+
+
 
   // Kullanıcıyı provider içine set et
   void setUser(UserModel user) {

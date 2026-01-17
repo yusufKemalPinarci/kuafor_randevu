@@ -4,9 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/shop_model.dart';
 
 class ShopProvider extends ChangeNotifier {
-  ShopModel? _selectedShop;
+  ShopModel? _shop;
 
-  ShopModel? get selectedShop => _selectedShop;
+  ShopModel? get shop => _shop;
 
   /// Local storage'dan shop'u yükler ve Provider'a aktarır
   Future<void> loadShopFromLocal() async {
@@ -15,7 +15,7 @@ class ShopProvider extends ChangeNotifier {
     if (shopJson != null) {
       try {
         final shopMap = jsonDecode(shopJson);
-        _selectedShop = ShopModel.fromJson(shopMap);
+        _shop = ShopModel.fromJson(shopMap);
         notifyListeners();
       } catch (e) {
         // JSON parse hatası varsa temizle
@@ -30,7 +30,7 @@ class ShopProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('selectedShop', jsonEncode(shop.toJson()));
     }
-    _selectedShop = shop;
+    _shop = shop;
     notifyListeners();
   }
 
@@ -38,13 +38,13 @@ class ShopProvider extends ChangeNotifier {
   Future<void> clearShop() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('selectedShop');
-    _selectedShop = null;
+    _shop = null;
     notifyListeners();
   }
 
   /// Sadece Provider içinde güncelleme yapmak istiyorsan bu kullanılabilir
   void updateSelectedShop(ShopModel shop) {
-    _selectedShop = shop;
+    _shop = shop;
     notifyListeners();
   }
 }

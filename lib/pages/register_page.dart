@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import '../core/constants.dart';
 import '../models/user_model.dart';
 import '../providers/user_provider.dart';
 
@@ -24,9 +23,6 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _obscureConfirm = true;
 
   bool _isLoading = false;
-
-// Önce _nameController ekleyelim
-
 
   Future<void> _register() async {
     final name = _nameController.text.trim();
@@ -49,7 +45,7 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     try {
-      final url = Uri.parse('https://node-js-api-8m2g.onrender.com/api/user/register'); // backend adresiniz
+      final url = Uri.parse('${AppConstants.baseUrl}/api/user/register');
 
       final response = await http.post(
         url,
@@ -60,31 +56,25 @@ class _RegisterPageState extends State<RegisterPage> {
           'name': name,
           'email': email,
           'password': pass,
-          // role göndermiyoruz, backend default atayacak
         }),
       );
       print('Response status: ${response.statusCode}');
       print('Response body: ${response.body}');
 
-
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
 
-        // Backend dönen user objesi: { user: { id, name, email, role } }
         final userJson = data['user'];
-
         final user = UserModel.fromJson(userJson);
 
-
-
-        // Provider ve SharedPreferences güncelle
+        if (!mounted) return;
         final userProvider = Provider.of<UserProvider>(context, listen: false);
         userProvider.setUser(user);
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user', jsonEncode(user.toJson()));
 
-
+        if (!mounted) return;
         Navigator.pushReplacementNamed(context, '/roleSelection');
       } else {
         final error = jsonDecode(response.body);
@@ -93,14 +83,16 @@ class _RegisterPageState extends State<RegisterPage> {
     } catch (e) {
       _showMessage("Bir hata oluştu: $e");
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-
   void _showMessage(String msg) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
@@ -135,7 +127,6 @@ class _RegisterPageState extends State<RegisterPage> {
                   icon: Icons.person_outline,
                 ),
                 const SizedBox(height: 20),
-
 
                 _buildInputField(
                   label: 'E-posta',

@@ -59,6 +59,8 @@ class _ShopEditPageState extends State<ShopEditPage> {
       isLoading = false;
     });
 
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Dükkan bilgileri güncellendi.')),
     );

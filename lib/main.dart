@@ -18,7 +18,7 @@ import 'pages/profil_page.dart';
 import 'pages/shop_detail_page.dart';
 import 'pages/shop_edit_page.dart';
 import 'pages/phone_verification_page.dart';
-import 'providers/shop_provider.dart';
+
 
 void main() {
   runApp(
@@ -46,7 +46,6 @@ class _BerberAppState extends State<BerberApp> {
   void initState() {
     super.initState();
     _loadUser();
-
   }
 
 
@@ -70,6 +69,7 @@ class _BerberAppState extends State<BerberApp> {
     print("user: ${userProvider.user}");
     //print("tokenExpiry: ${userProvider.user?.tokenExpiry}");
    // print("isTokenValid: ${userProvider.user?.isTokenValid}");
+
     if (_isLoading) {
       return const MaterialApp(
         home: Scaffold(
@@ -102,7 +102,7 @@ class _BerberAppState extends State<BerberApp> {
         '/working-hours': (context) => const WorkingDaysPage(),
         '/barber-shop-options': (context) => const ShopOptionPage(),
         '/shop_selection_page': (context) => const ShopSelectionPage(),
-        '/create-shop-page': (context) => const CreateShopPage(),
+        '/create-shop-page': (context) => CreateShopPage(),
         '/verification-required': (context) => const VerificationRequiredPage(),
         '/profile_page': (context) => const ProfilePage(),
         '/shop_detail_page': (context) => const ShopDetailPage(),

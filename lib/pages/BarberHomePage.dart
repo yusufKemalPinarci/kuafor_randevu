@@ -33,13 +33,14 @@ class _BarberHomePageState extends State<BarberHomePage> {
 
  @override
   Widget build(BuildContext context) {
-    final userProvider = Provider.of<UserProvider>(context);
+    final userProvider = Provider.of<UserProvider>(context,listen: false);
 
     final totalAppointments = todaysAppointments.length;
     bool isVerified = true; // Bunu sen API’den çekeceksin
-    bool hasShop = userProvider.user?.selectedShop != null;   // dükkanı var mı yok mu bunu da api den çekicez
+    bool hasShop = userProvider.user?.shopId != " ";   // dükkanı var mı yok mu bunu da api den çekicez
     int maxAppointments = 10; // bu gün ne kadar randevu alabilecek.bu kısmı nasıl ayarlıyacaz.
-
+    print("dükkan id");
+    print(userProvider.user?.shopId);
     return Scaffold(
       backgroundColor: const Color(0xFF1F1F1F),
       appBar: AppBar(

@@ -1,4 +1,5 @@
 import 'package:kuafor_randevu/models/shop_model.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 
 class UserModel {
   final String id;
@@ -95,10 +96,37 @@ class UserModel {
     };
   }
 
-  /*bool get isTokenValid {
-    if (tokenExpiry == null) return false;
-    return tokenExpiry!.isAfter(DateTime.now());
-  }*/
+  /// 🔐 Token geçerliliğini güvenli kontrol et
+  bool get isTokenValid {
+    if (jwtToken == null || jwtToken!.isEmpty) {
+      print('⚠️ Token boş veya null');
+      return false;
+    }
+
+    try {
+      if (JwtDecoder.isExpired(jwtToken!)) {
+        print('❌ Token süresi dolmuş');
+        return false;
+      } else {
+        final expiry = JwtDecoder.getExpirationDate(jwtToken!);
+        print('✅ Token geçerli. Bitiş tarihi: $expiry');
+        return true;
+      }
+    } catch (e) {
+      print('⚠️ Invalid token format: $e');
+      return false;
+    }
+  }
+
+  bool isJwtValid(String token) {
+    return !JwtDecoder.isExpired(token);
+  }
+
+  DateTime getExpiryDate(String token) {
+    return JwtDecoder.getExpirationDate(token);
+  }
+
+
 
 
 }

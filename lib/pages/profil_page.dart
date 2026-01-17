@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:kuafor_randevu/pages/shop_selection_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/shop_provider.dart';
 import '../providers/user_provider.dart';
 
@@ -29,7 +30,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final userProvider = Provider.of<UserProvider>(context);
     final user = userProvider.user;
 
-    final hasShop = user?.shopId != null;
+    final hasShop = user?.shopId != "";
     final userName = user?.name ?? '';
     final userEmail = user?.email ?? '';
     final userPhone = user?.phone?? ''; // Eğer phoneNumber alanı varsa
@@ -166,10 +167,14 @@ class _ProfilePageState extends State<ProfilePage> {
               onPressed: () async{
                 final userProvider = Provider.of<UserProvider>(context, listen: false);
                 final shopProvider = Provider.of<ShopProvider>(context, listen: false);
+                final prefs = await SharedPreferences.getInstance();
+                print("user bilgisi");
+                print(prefs.getString('user'));
 
                 await userProvider.logout();
                 await shopProvider.clearShop(); // temizle
 
+                if (!mounted) return;
                 Navigator.pushNamed(context, '/login');
               },
               icon: const Icon(Icons.logout, color: Colors.redAccent),

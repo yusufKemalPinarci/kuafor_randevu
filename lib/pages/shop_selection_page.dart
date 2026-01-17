@@ -87,6 +87,7 @@ class _ShopSelectionPageState extends State<ShopSelectionPage> {
 
 
     if (updatedUserFromApi == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Dükkan seçimi API'de başarısız oldu")),
       );
@@ -104,6 +105,7 @@ class _ShopSelectionPageState extends State<ShopSelectionPage> {
     await prefs.setString('selectedShop', jsonEncode(shop.toJson()));
 
     // 4. Yönlendirme
+    if (!mounted) return;
     if (widget.redirectToSuccessPage) {
       Navigator.pushReplacement(
         context,
@@ -158,7 +160,7 @@ class _ShopSelectionPageState extends State<ShopSelectionPage> {
                 boxShadow: isSelected
                     ? [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.4),
+                    color: Colors.black.withValues(alpha: 0.4),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   )
