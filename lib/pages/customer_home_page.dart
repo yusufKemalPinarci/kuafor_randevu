@@ -55,6 +55,28 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     });
   }
 
+  void _showLoginPrompt(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2C2C2C),
+        title: const Text('Giriş Gerekli', style: TextStyle(color: Colors.white)),
+        content: const Text('Bu özelliği kullanmak için giriş yapmanız gerekmektedir.', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('İptal')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/login');
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFC69749)),
+            child: const Text('Giriş Yap', style: TextStyle(color: Colors.black)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
@@ -66,17 +88,27 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         backgroundColor: const Color(0xFF1F1F1F),
         title: const Text('Berberler', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         actions: [
-          if (isLoggedIn) ...[
-            IconButton(
-              icon: const Icon(Icons.calendar_month, color: Color(0xFFC69749)),
-              onPressed: () => Navigator.pushNamed(context, '/customer-appointments'),
-            ),
-            IconButton(
-              icon: const Icon(Icons.account_circle, color: Color(0xFFC69749)),
-              onPressed: () => Navigator.pushNamed(context, '/profile_page'),
-            ),
-          ]
-          else
+          IconButton(
+            icon: const Icon(Icons.calendar_month, color: Color(0xFFC69749)),
+            onPressed: () {
+              if (isLoggedIn) {
+                Navigator.pushNamed(context, '/customer-appointments');
+              } else {
+                _showLoginPrompt(context);
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.account_circle, color: Color(0xFFC69749)),
+            onPressed: () {
+              if (isLoggedIn) {
+                Navigator.pushNamed(context, '/profile_page');
+              } else {
+                _showLoginPrompt(context);
+              }
+            },
+          ),
+          if (!isLoggedIn)
             TextButton(
               onPressed: () => Navigator.pushNamed(context, '/login'),
               child: const Text('Giriş Yap', style: TextStyle(color: Color(0xFFC69749))),

@@ -97,6 +97,10 @@ router.post('/',authMiddleware, async (req, res) => {
     });
 
     await shop.save();
+
+    // Update user role to Admin when they create a shop
+    await User.findByIdAndUpdate(ownerId, { role: 'Admin', shopId: shop._id });
+
     res.status(201).json(shop);
   } catch (err) {
    console.error('Shop create error:', err.message, err);
@@ -341,8 +345,15 @@ router.get('/', async (req, res) => {
  */
 //dükkana çalışan ekleme          // Dükkan sahibi tarafında lazım.
 // PUT /api/shop/:id/add-staff
-router.put('/:id/add-staff', async (req, res) => {
+router.put('/:id/add-staff', authMiddleware, async (req, res) => {
   try {
+    const shop = await Shop.findById(req.params.id);
+    if (!shop) return res.status(404).json({ message: 'Shop not found' });
+
+    if (shop.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Only the shop owner can add staff' });
+    }
+
     let { email } = req.body;
     email = email.toLowerCase(); // artık hata yok
 
@@ -372,5 +383,52 @@ router.put('/:id/add-staff', async (req, res) => {
 
 
 
+
+/**
+ * @swagger
+ * /api/shop/{id}/remove-staff:
+ *   put:
+ *     summary: Dükkan çalışanı çıkar
+ *     tags: [Shop]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Çalışan çıkarıldı
+ */
+router.put('/:id/remove-staff', authMiddleware, async (req, res) => {
+  try {
+    const shop = await Shop.findById(req.params.id);
+    if (!shop) return res.status(404).json({ message: 'Shop not found' });
+
+    if (shop.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Only the shop owner can remove staff' });
+    }
+
+    let { email } = req.body;
+    if (!email) return res.status(400).json({ message: 'Email is required' });
+    email = email.toLowerCase();
+
+    shop.staffEmails = shop.staffEmails.filter(e => e.toLowerCase() !== email);
+    await shop.save();
+
+    res.status(200).json({ message: 'Staff removed successfully', shop });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
 
 module.exports = router;

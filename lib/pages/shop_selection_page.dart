@@ -18,30 +18,25 @@ class ShopSelectionPage extends StatefulWidget {
 }
 
 class _ShopSelectionPageState extends State<ShopSelectionPage> {
-  List<ShopModel> assignedShops = [];
+  List<ShopModel> _allShops = [];
+  List<ShopModel> _filteredShops = [];
   String? _selectedShopId;
   bool _isLoading = true;
+  final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    fetchAssignedShops();
+    _fetchAllShops();
   }
 
-  Future<void> fetchAssignedShops() async {
+  Future<void> _fetchAllShops() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final user = userProvider.user;
-
-      if (user == null || user.email.isEmpty) {
-        throw Exception("Kullanıcı e-posta bilgisi eksik.");
-      }
-
-      final url = Uri.parse('https://node-js-api-8m2g.onrender.com/api/shop/by-staff-email?email=${Uri.encodeComponent(user.email)}');
+      final url = Uri.parse('${AppConstants.baseUrl}/api/shop');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
@@ -49,7 +44,8 @@ class _ShopSelectionPageState extends State<ShopSelectionPage> {
         final List<ShopModel> fetchedShops = jsonList.map((json) => ShopModel.fromJson(json)).toList();
 
         setState(() {
-          assignedShops = fetchedShops;
+          _allShops = fetchedShops;
+          _filteredShops = _allShops;
           _isLoading = false;
         });
       } else {
@@ -58,10 +54,21 @@ class _ShopSelectionPageState extends State<ShopSelectionPage> {
     } catch (e) {
       print("Dükkanlar alınamadı: $e");
       setState(() {
-        assignedShops = [];
+        _allShops = [];
+        _filteredShops = [];
         _isLoading = false;
       });
     }
+  }
+
+  void _filterShops(String query) {
+    setState(() {
+      _filteredShops = _allShops
+          .where((shop) =>
+              shop.name.toLowerCase().contains(query.toLowerCase()) ||
+              shop.city.toLowerCase().contains(query.toLowerCase()))
+          .toList();
+    });
   }
 
 
@@ -123,61 +130,84 @@ class _ShopSelectionPageState extends State<ShopSelectionPage> {
       backgroundColor: const Color(0xFF1F1F1F),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1F1F1F),
-        title: const Text("Dükkan Seç", style: TextStyle(color: Colors.white)),
+        title: const Text("Çalıştığın Dükkanı Seç", style: TextStyle(color: Colors.white)),
         centerTitle: true,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFC69749)))
-          : assignedShops.isEmpty
-          ? const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24.0),
-          child: Text(
-            "Size atanmış dükkan bulunamadı.\n\n"
-                "Eğer oluşturulan dükkana katılmak istiyorsanız, dükkanı oluşturan kişiden "
-                "çalışan alanına sizin e-posta adresinizi girmesini isteyiniz. "
-                "O zaman listede dükkanı görebileceksiniz.",
-            style: TextStyle(color: Colors.white70, fontSize: 18),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      )
-          : ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-        itemCount: assignedShops.length,
-        itemBuilder: (context, index) {
-          final shop = assignedShops[index];
-          final isSelected = shop.id == _selectedShopId;
-
-          return GestureDetector(
-            onTap: () => _onShopSelected(shop),
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 8),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFFC69749) : const Color(0xFF2C2C2C),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: isSelected
-                    ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  )
-                ]
-                    : null,
-              ),
-              child: Text(
-                shop.name,
-                style: TextStyle(
-                  color: isSelected ? Colors.black : Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _filterShops,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Dükkan ara...',
+                hintStyle: const TextStyle(color: Colors.white54),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFFC69749)),
+                filled: true,
+                fillColor: const Color(0xFF2C2C2C),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
             ),
-          );
-        },
+          ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFFC69749)))
+                : _filteredShops.isEmpty
+                    ? const Center(child: Text('Dükkan bulunamadı.', style: TextStyle(color: Colors.white54)))
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: _filteredShops.length,
+                        itemBuilder: (context, index) {
+                          final shop = _filteredShops[index];
+                          final isSelected = shop.id == _selectedShopId;
+
+                          return GestureDetector(
+                            onTap: () => _onShopSelected(shop),
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(vertical: 8),
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: isSelected ? const Color(0xFFC69749) : const Color(0xFF2C2C2C),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        shop.name,
+                                        style: TextStyle(
+                                          color: isSelected ? Colors.black : Colors.white,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${shop.city}, ${shop.neighborhood}',
+                                        style: TextStyle(
+                                          color: isSelected ? Colors.black54 : Colors.white54,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Icon(
+                                    Icons.arrow_forward_ios,
+                                    color: isSelected ? Colors.black : const Color(0xFFC69749),
+                                    size: 16,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
       ),
     );
   }

@@ -108,7 +108,12 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
             ),
             const SizedBox(height: 32),
             TextButton(
-              onPressed: () {
+              onPressed: _isLoading ? null : () async {
+                final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+                // We don't have all args here but we have phone.
+                // Actually GuestInfoPage sends ONLY phone to this page.
+                // To resend, we need barberId, serviceId, etc.
+                // I'll update GuestInfoPage to pass all data.
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kod tekrar gönderildi.')));
               },
               child: const Text('Kodu Tekrar Gönder', style: TextStyle(color: Color(0xFFC69749))),

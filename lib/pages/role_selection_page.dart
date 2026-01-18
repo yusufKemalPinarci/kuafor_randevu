@@ -1,17 +1,71 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:provider/provider.dart';
+import '../core/constants.dart';
+import '../providers/user_provider.dart';
+import '../models/user_model.dart';
 
-class RoleSelectionPage extends StatelessWidget {
+class RoleSelectionPage extends StatefulWidget {
   const RoleSelectionPage({super.key});
 
-  void _selectRole(BuildContext context, String role) {
-    // Seçilen rolü backend'e gönderip kayıt etmek istiyorsan burada yapabilirsin
+  @override
+  State<RoleSelectionPage> createState() => _RoleSelectionPageState();
+}
 
-    if (role == 'berber') {
-      // Berber ana ekranına yönlendir
-      Navigator.pushReplacementNamed(context, '/barber-shop-options');
-    } else if (role == 'musteri') {
-      // Müşteri ana ekranına yönlendir
-      Navigator.pushReplacementNamed(context, '/customerHome');
+class _RoleSelectionPageState extends State<RoleSelectionPage> {
+  bool _isLoading = false;
+
+  Future<void> _selectRole(BuildContext context, String role) async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final user = userProvider.user;
+
+    if (user == null || user.jwtToken == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hata: Oturum bulunamadı.')));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final roleMap = {
+        'berber': 'Barber',
+        'musteri': 'Customer',
+      };
+
+      final response = await http.put(
+        Uri.parse('${AppConstants.baseUrl}/api/user/role'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${user.jwtToken}',
+        },
+        body: jsonEncode({'role': roleMap[role]}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final updatedUser = UserModel.fromJson({
+          ...data['user'],
+          'jwtToken': user.jwtToken,
+        });
+
+        await userProvider.saveUserToLocal(updatedUser);
+
+        if (!mounted) return;
+        if (role == 'berber') {
+          Navigator.pushReplacementNamed(context, '/barber-shop-options');
+        } else {
+          Navigator.pushReplacementNamed(context, '/customerHome');
+        }
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Rol güncellenemedi.')));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Hata oluştu: $e')));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -39,20 +93,23 @@ class RoleSelectionPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 36),
 
-                _buildRoleButton(
-                  context,
-                  label: "Berber",
-                  icon: Icons.cut,
-                  onTap: () => _selectRole(context, 'berber'),
-                ),
-                const SizedBox(height: 24),
-
-                _buildRoleButton(
-                  context,
-                  label: "Müşteri",
-                  icon: Icons.person_outline,
-                  onTap: () => _selectRole(context, 'musteri'),
-                ),
+                if (_isLoading)
+                  const CircularProgressIndicator(color: Color(0xFFC69749))
+                else ...[
+                  _buildRoleButton(
+                    context,
+                    label: "Berber",
+                    icon: Icons.cut,
+                    onTap: () => _selectRole(context, 'berber'),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildRoleButton(
+                    context,
+                    label: "Müşteri",
+                    icon: Icons.person_outline,
+                    onTap: () => _selectRole(context, 'musteri'),
+                  ),
+                ],
               ],
             ),
           ),

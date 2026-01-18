@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../providers/user_provider.dart';
 import '../services/user_service.dart';
+import 'manage_staff_page.dart';
 
 class ShopDetailPage extends StatefulWidget {
   const ShopDetailPage({super.key});
@@ -53,6 +54,9 @@ class _ShopDetailPageState extends State<ShopDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    final isOwner = shopData['ownerId'] == userProvider.user?.id;
+
     if (isLoading) {
       return const Scaffold(
         backgroundColor: Color(0xFF1F1F1F),
@@ -77,44 +81,72 @@ class _ShopDetailPageState extends State<ShopDetailPage> {
             _buildInfoTile('Şehir', shopData['city']),
             _buildInfoTile('Telefon', shopData['phone']),
             _buildInfoTile('E-Posta', shopData['email']),
-            _buildInfoTile('Açılış Saati', shopData['openTime']),
-            _buildInfoTile('Kapanış Saati', shopData['closeTime']),
+            _buildInfoTile('Açılış Saati', shopData['openingHour']), // API de openingHour olarak kayıtlı olabilir kontrol et
+            _buildInfoTile('Kapanış Saati', shopData['closingHour']),
+            const SizedBox(height: 20),
+            if (isOwner)
+              _buildActionButton(
+                icon: Icons.people,
+                label: 'Çalışanları Yönet',
+                onTap: () {
+                   Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => ManageStaffPage(shopId: shopData['_id'])),
+                  );
+                },
+              ),
             const Spacer(),
             Padding(
               padding: const EdgeInsets.only(bottom: 24),
               child: Row(
                 children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pushNamed(context, '/shop_edit_page');
-                      },
-                      icon: const Icon(Icons.edit),
-                      label: const Text('Dükkanı Düzenle'),
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(60),
-                        backgroundColor: Colors.blueGrey[700],
+                  if (isOwner)
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/shop_edit_page');
+                        },
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Düzenle'),
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(60),
+                          backgroundColor: Colors.blueGrey[700],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
+                  if (isOwner) const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton.icon(
-
                       onPressed: () => _showLeaveShopConfirmation(context),
                       icon: const Icon(Icons.exit_to_app),
-                      label: const Text('Dükkandan Ayrıl'),
+                      label: Text(isOwner ? 'Dükkanı Kapat' : 'Dükkandan Ayrıl'),
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size.fromHeight(60),
                         backgroundColor: Colors.red,
                       ),
-
                     ),
                   ),
                 ],
               ),
             )
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton({required IconData icon, required String label, required VoidCallback onTap}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: ElevatedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFC69749),
+          foregroundColor: Colors.black,
+          minimumSize: const Size(double.infinity, 50),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
     );

@@ -72,9 +72,9 @@ class _BarberHomePageState extends State<BarberHomePage> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF1F1F1F),
         elevation: 0,
-        title: const Text(
-          'Berber Paneli',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        title: Text(
+          'Hoşgeldin, ${user?.name ?? "Berber"}',
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
         ),
         centerTitle: true,
         actions: [

@@ -689,4 +689,49 @@ router.put('/availability', authMiddleware, async (req, res) => {
 
 
 
+/**
+ * @swagger
+ * /api/user/role:
+ *   put:
+ *     summary: Kullanıcı rolünü güncelle
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               role:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Rol güncellendi
+ */
+router.put('/role', authMiddleware, async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!role) return res.status(400).json({ error: 'Role is required' });
+
+    const user = req.user;
+    user.role = role;
+    await user.save();
+
+    res.json({
+      message: 'Role updated successfully',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        shopId: user.shopId
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

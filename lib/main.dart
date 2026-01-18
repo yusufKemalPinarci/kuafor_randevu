@@ -103,7 +103,7 @@ class _BerberAppState extends State<BerberApp> {
         ),
       ),
       home: userProvider.isLoggedIn
-          ? (userProvider.user?.role == 'Barber'
+          ? (userProvider.user?.role == 'Barber' || userProvider.user?.role == 'Admin'
               ? const BarberHomePage()
               : const CustomerHomePage())
           : const LoginPage(),
