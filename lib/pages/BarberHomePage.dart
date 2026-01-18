@@ -57,6 +57,12 @@ class _BarberHomePageState extends State<BarberHomePage> {
     final user = userProvider.user;
 
     final totalAppointments = _appointments.length;
+    final pendingCount = _appointments.where((a) => a['status'] == 'pending').length;
+    final confirmedCount = _appointments.where((a) => a['status'] == 'confirmed').length;
+
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    final todaysCount = _appointments.where((a) => a['date'].startsWith(today)).length;
+
     bool isVerified = user?.isPhoneVerified ?? false;
     bool hasShop = user?.shopId != null && user!.shopId!.trim().isNotEmpty;
     int maxAppointments = 10;
@@ -137,11 +143,25 @@ class _BarberHomePageState extends State<BarberHomePage> {
                     Row(
                       children: [
                         Expanded(
+                          child: _buildStatCard('Bugün', '$todaysCount'),
+                        ),
+                        Expanded(
+                          child: _buildStatCard('Bekleyen', '$pendingCount'),
+                        ),
+                        Expanded(
+                          child: _buildStatCard('Onaylı', '$confirmedCount'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
                           child: _buildStatCard('Toplam Randevu', '$totalAppointments'),
                         ),
                         Expanded(
                           child: _buildStatCard('Doluluk Oranı',
-                            '${(totalAppointments / maxAppointments * 100).clamp(0, 100).toStringAsFixed(1)}%'),
+                            '${(todaysCount / maxAppointments * 100).clamp(0, 100).toStringAsFixed(1)}%'),
                         ),
                       ],
                     ),
@@ -170,20 +190,43 @@ class _BarberHomePageState extends State<BarberHomePage> {
                     ),
                     const SizedBox(height: 20),
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 24),
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/allAppointments');
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFC69749),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        child: const Text(
-                          'Tüm Randevuları Görüntüle',
-                          style: TextStyle(color: Colors.white, fontSize: 18),
-                        ),
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/allAppointments');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFC69749),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              ),
+                              child: const Text(
+                                'Randevular',
+                                style: TextStyle(color: Colors.white, fontSize: 16),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/manage-services');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFC69749),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              ),
+                              child: const Text(
+                                'Hizmetlerim',
+                                style: TextStyle(color: Colors.white, fontSize: 16),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],

@@ -25,6 +25,8 @@ import 'pages/service_selection_page.dart';
 import 'pages/date_time_selection_page.dart';
 import 'pages/guest_info_page.dart';
 import 'pages/otp_verification_page.dart';
+import 'pages/manage_services_page.dart';
+import 'pages/customer_appointments_page.dart';
 
 
 void main() async {
@@ -128,6 +130,8 @@ class _BerberAppState extends State<BerberApp> {
         '/dateTimeSelection': (context) => const DateTimeSelectionPage(),
         '/guestInfo': (context) => const GuestInfoPage(),
         '/otpVerification': (context) => const OtpVerificationPage(),
+        '/manage-services': (context) => const ManageServicesPage(),
+        '/customer-appointments': (context) => const CustomerAppointmentsPage(),
       },
     );
   }

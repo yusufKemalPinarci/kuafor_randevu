@@ -66,11 +66,16 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         backgroundColor: const Color(0xFF1F1F1F),
         title: const Text('Berberler', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         actions: [
-          if (isLoggedIn)
+          if (isLoggedIn) ...[
+            IconButton(
+              icon: const Icon(Icons.calendar_month, color: Color(0xFFC69749)),
+              onPressed: () => Navigator.pushNamed(context, '/customer-appointments'),
+            ),
             IconButton(
               icon: const Icon(Icons.account_circle, color: Color(0xFFC69749)),
               onPressed: () => Navigator.pushNamed(context, '/profile_page'),
-            )
+            ),
+          ]
           else
             TextButton(
               onPressed: () => Navigator.pushNamed(context, '/login'),

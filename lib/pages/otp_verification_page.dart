@@ -107,6 +107,13 @@ class _OtpVerificationPageState extends State<OtpVerificationPage> {
               maxLength: 6,
             ),
             const SizedBox(height: 32),
+            TextButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kod tekrar gönderildi.')));
+              },
+              child: const Text('Kodu Tekrar Gönder', style: TextStyle(color: Color(0xFFC69749))),
+            ),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _isLoading ? null : _verifyOtp,
               style: ElevatedButton.styleFrom(

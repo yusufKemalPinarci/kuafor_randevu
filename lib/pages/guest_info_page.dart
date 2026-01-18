@@ -142,7 +142,12 @@ class _GuestInfoPageState extends State<GuestInfoPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('İletişim Bilgileri', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
+            const Text(
+              'Randevunuzu onaylamak için telefonunuza bir doğrulama kodu gönderilecektir.',
+              style: TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+            const SizedBox(height: 24),
             TextField(
               controller: _nameController,
               style: const TextStyle(color: Colors.white),
