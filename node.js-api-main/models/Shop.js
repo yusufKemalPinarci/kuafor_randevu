@@ -11,6 +11,7 @@ const shopSchema = new mongoose.Schema({
   openingHour: { type: String, required: true },
   closingHour: { type: String, required: true },
   workingDays: [{ type: String, required: true }],
+  dailyCapacity: { type: Number, default: 10 },
   ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   staffEmails: [{ type: String }],
 }, { timestamps: true });

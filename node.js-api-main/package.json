@@ -23,6 +23,7 @@
     "twilio": "^5.8.0"
   },
   "devDependencies": {
+    "jest": "^30.2.0",
     "nodemon": "^3.1.10"
   }
 }
