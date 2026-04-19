@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const shopSchema = new mongoose.Schema({
   name: { type: String, required: true },
+  shopCode: { type: String, unique: true, required: true }, // Eklendi (Dükkan Davet Kodu)
   fullAddress: { type: String, required: true },
   neighborhood: { type: String, required: true },
   city: { type: String, required: true },
@@ -12,7 +13,7 @@ const shopSchema = new mongoose.Schema({
   closingHour: { type: String, required: true },
   workingDays: [{ type: String, required: true }],
   ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  staffEmails: [{ type: String }],
+  autoConfirmAppointments: { type: Boolean, default: false },
 }, { timestamps: true });
 
 

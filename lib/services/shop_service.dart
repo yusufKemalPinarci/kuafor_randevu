@@ -1,27 +1,32 @@
 import 'dart:convert';
 import '../core/constants.dart';
-import 'package:http/http.dart' as http;
+import 'api_client.dart';
 
 class ShopService {
   final String baseUrl = "${AppConstants.baseUrl}/api/shop";
+  final ApiClient _client = ApiClient();
 
   Future<Map<String, dynamic>> createShop(Map<String, dynamic> data, {String? token}) async {
-    final headers = {
-      "Content-Type": "application/json",
-      if (token != null) "Authorization": "Bearer $token",
-    };
-
-    final response = await http.post(
-      Uri.parse(baseUrl),
-      headers: headers,
-      body: jsonEncode(data),
-    );
+    final response = await _client.post('/api/shop', body: data);
 
     if (response.statusCode == 201) {
-      // Backend'in döndürdüğü cevabı Map olarak parse et
       return jsonDecode(response.body) as Map<String, dynamic>;
     } else {
-      throw Exception("Dükkan oluşturulamadı: ${response.body}");
+      throw Exception("Dükkan oluşturulamadı. Lütfen bilgileri kontrol edip tekrar deneyin.");
+    }
+  }
+
+  Future<Map<String, dynamic>> joinShop(String shopCode, String token) async {
+    final response = await _client.post(
+      '/api/shop/join',
+      body: {"shopCode": shopCode},
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? "Dükkana katılma başarısız oldu. Davet kodunu kontrol edin.");
     }
   }
 }

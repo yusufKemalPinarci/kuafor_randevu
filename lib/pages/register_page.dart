@@ -1,11 +1,9 @@
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../core/constants.dart';
-import '../models/user_model.dart';
+import '../core/app_theme.dart';
+import '../core/app_widgets.dart';
 import '../providers/user_provider.dart';
+import '../services/firebase_auth_service.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -14,15 +12,37 @@ class RegisterPage extends StatefulWidget {
   State<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _RegisterPageState extends State<RegisterPage> {
+class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderStateMixin {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
   final _nameController = TextEditingController();
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
-
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
+  final _firebaseAuth = FirebaseAuthService();
+  String _selectedRole = 'Customer';
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+    _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
+    _fadeController.forward();
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
+    _nameController.dispose();
+    super.dispose();
+  }
 
   Future<void> _register() async {
     final name = _nameController.text.trim();
@@ -31,215 +51,428 @@ class _RegisterPageState extends State<RegisterPage> {
     final confirm = _confirmController.text;
 
     if (name.isEmpty || email.isEmpty || pass.isEmpty || confirm.isEmpty) {
-      _showMessage("Lütfen tüm alanları doldurun.");
+      showAppSnackBar(context, "Lütfen tüm alanları doldurun.", isError: true);
       return;
     }
 
     if (pass != confirm) {
-      _showMessage("Şifreler eşleşmiyor.");
+      showAppSnackBar(context, "Şifreler eşleşmiyor.", isError: true);
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    final emailRegex = RegExp(r'^[\w.+-]+@[\w-]+\.[\w.]+$');
+    if (!emailRegex.hasMatch(email)) {
+      showAppSnackBar(context, "Lütfen geçerli bir e-posta adresi girin.", isError: true);
+      return;
+    }
+
+    if (pass.length < 6) {
+      showAppSnackBar(context, "Şifre en az 6 karakter olmalıdır.", isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
 
     try {
-      final url = Uri.parse('${AppConstants.baseUrl}/api/user/register');
-
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'name': name,
-          'email': email,
-          'password': pass,
-        }),
+      final result = await _firebaseAuth.registerWithEmail(
+        name: name,
+        email: email,
+        password: pass,
+        role: _selectedRole,
       );
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(response.body);
+      if (!mounted) return;
 
-        final userJson = data['user'];
-        final user = UserModel.fromJson(userJson);
+      if (result.error != null) {
+        showAppSnackBar(context, result.error!, isError: true);
+        return;
+      }
 
-        if (!mounted) return;
-        final userProvider = Provider.of<UserProvider>(context, listen: false);
-        userProvider.setUser(user);
+      final user = result.user;
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      await userProvider.saveUserToLocal(user);
 
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user', jsonEncode(user.toJson()));
-
-        if (!mounted) return;
-        Navigator.pushReplacementNamed(context, '/roleSelection');
+      if (!mounted) return;
+      if (user.role == 'Barber') {
+        Navigator.pushReplacementNamed(context, '/barberHome');
       } else {
-        final error = jsonDecode(response.body);
-        _showMessage(error['error'] ?? "Kayıt başarısız oldu.");
+        Navigator.pushReplacementNamed(context, '/customerHome');
       }
-    } catch (e) {
-      _showMessage("Bir hata oluştu: $e");
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _showMessage(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  Future<void> _registerWithGoogle() async {
+    final roleLabel = _selectedRole == 'Barber' ? 'Berber' : 'Müşteri';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.ct.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
+        title: Text('Kayıtı Onayla',
+            style: TextStyle(color: context.ct.textPrimary, fontWeight: FontWeight.w700, fontSize: 20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(Spacing.lg),
+              decoration: BoxDecoration(
+                color: context.ct.surfaceLight,
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(color: AppColors.primary.withAlpha(60)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withAlpha(20),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _selectedRole == 'Barber' ? Icons.content_cut : Icons.person_outline,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(roleLabel,
+                            style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16)),
+                        Text('olarak Google ile kayıt olacaksınız',
+                            style: TextStyle(color: context.ct.textSecondary, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Devam etmek istiyor musunuz?',
+              style: TextStyle(color: context.ct.textTertiary, fontSize: 13),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Vazgeç', style: TextStyle(color: context.ct.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Devam Et', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isGoogleLoading = true);
+    try {
+      final result = await _firebaseAuth.signInWithGoogle(role: _selectedRole);
+
+      if (!mounted) return;
+
+      // Kullanıcı iptal etti
+      if (result.error == null && !result.needsRole && result.user.id.isEmpty) {
+        return;
+      }
+
+      if (result.error != null) {
+        showAppSnackBar(context, result.error!, isError: true);
+        return;
+      }
+
+      final user = result.user;
+      await Provider.of<UserProvider>(context, listen: false).saveUserToLocal(user);
+      if (!mounted) return;
+      if (user.role == 'Barber') {
+        Navigator.pushReplacementNamed(context, '/barberHome');
+      } else {
+        Navigator.pushReplacementNamed(context, '/customerHome');
+      }
+    } finally {
+      if (mounted) setState(() => _isGoogleLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1F1F1F),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+      backgroundColor: context.ct.bg,
+      body: Stack(
+        children: [
+          // Background glow
+          Positioned(
+            top: -80,
+            left: -50,
+            child: Container(
+              width: 240,
+              height: 240,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(colors: [AppColors.primary.withAlpha(20), Colors.transparent]),
+              ),
+            ),
+          ),
+
+          SafeArea(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Icon(Icons.person_add_alt_1, size: 72, color: Color(0xFFC69749)),
-                const SizedBox(height: 12),
-                const Text(
-                  'Kayıt Ol',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
+                // Top bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: Spacing.xs),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.arrow_back_ios_new, color: context.ct.textSecondary, size: 20),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      const Spacer(),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 36),
 
-                _buildInputField(
-                  label: 'Ad Soyad',
-                  controller: _nameController,
-                  hint: 'Adınızı ve soyadınızı girin',
-                  icon: Icons.person_outline,
-                ),
-                const SizedBox(height: 20),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: Spacing.xxl + 4),
+                    child: FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: Spacing.sm),
+                          Text('Hesap Oluştur', style: Theme.of(context).textTheme.headlineLarge),
+                          const SizedBox(height: Spacing.sm),
+                          Text(
+                            'KuaFlex\'e katıl ve randevularını kolayca yönet',
+                            style: TextStyle(fontSize: 14, color: context.ct.textTertiary),
+                          ),
+                          const SizedBox(height: Spacing.xxxl),
 
-                _buildInputField(
-                  label: 'E-posta',
-                  controller: _emailController,
-                  hint: 'ornek@mail.com',
-                  icon: Icons.email_outlined,
-                ),
-                const SizedBox(height: 20),
+                          // Role Selector
+                          Container(
+                            decoration: BoxDecoration(
+                              color: context.ct.surface,
+                              borderRadius: BorderRadius.circular(AppRadius.lg),
+                              border: Border.all(color: context.ct.surfaceBorder),
+                            ),
+                            child: Row(
+                              children: [
+                                _buildRoleTab('Customer', 'Müşteri', Icons.person_outline),
+                                _buildRoleTab('Barber', 'Berber', Icons.content_cut),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: Spacing.xxl),
 
-                _buildInputField(
-                  label: 'Şifre',
-                  controller: _passwordController,
-                  hint: 'Şifre oluşturun',
-                  icon: Icons.lock_outline,
-                  isPassword: true,
-                  isObscure: _obscurePassword,
-                  onToggleVisibility: () {
-                    setState(() => _obscurePassword = !_obscurePassword);
-                  },
-                ),
-                const SizedBox(height: 20),
+                          // Name
+                          TextField(
+                            controller: _nameController,
+                            style: TextStyle(color: context.ct.textPrimary, fontSize: 15),
+                            cursorColor: AppColors.primary,
+                            decoration: const InputDecoration(
+                              prefixIcon: Icon(Icons.person_outline, size: 22),
+                              hintText: 'Ad Soyad',
+                            ),
+                          ),
+                          const SizedBox(height: Spacing.md + 2),
 
-                _buildInputField(
-                  label: 'Şifre Tekrar',
-                  controller: _confirmController,
-                  hint: 'Şifrenizi tekrar girin',
-                  icon: Icons.lock_reset,
-                  isPassword: true,
-                  isObscure: _obscureConfirm,
-                  onToggleVisibility: () {
-                    setState(() => _obscureConfirm = !_obscureConfirm);
-                  },
-                ),
-                const SizedBox(height: 36),
+                          // Email
+                          TextField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            style: TextStyle(color: context.ct.textPrimary, fontSize: 15),
+                            cursorColor: AppColors.primary,
+                            decoration: const InputDecoration(
+                              prefixIcon: Icon(Icons.email_outlined, size: 22),
+                              hintText: 'E-posta adresi',
+                            ),
+                          ),
+                          const SizedBox(height: Spacing.md + 2),
 
-                _isLoading
-                    ? const CircularProgressIndicator(color: Color(0xFFC69749))
-                    : ElevatedButton(
-                  onPressed: _register,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFC69749),
-                    minimumSize: const Size(double.infinity, 55),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                          // Password
+                          TextField(
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            style: TextStyle(color: context.ct.textPrimary, fontSize: 15),
+                            cursorColor: AppColors.primary,
+                            decoration: InputDecoration(
+                              prefixIcon: const Icon(Icons.lock_outline, size: 22),
+                              hintText: 'Şifre (min. 6 karakter)',
+                              suffixIcon: IconButton(
+                                icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 22),
+                                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: Spacing.md + 2),
+
+                          // Confirm Password
+                          TextField(
+                            controller: _confirmController,
+                            obscureText: _obscureConfirm,
+                            style: TextStyle(color: context.ct.textPrimary, fontSize: 15),
+                            cursorColor: AppColors.primary,
+                            decoration: InputDecoration(
+                              prefixIcon: const Icon(Icons.lock_reset, size: 22),
+                              hintText: 'Şifre tekrar',
+                              suffixIcon: IconButton(
+                                icon: Icon(_obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 22),
+                                onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: Spacing.xxxl),
+
+                          // Register Button
+                          AppLoadingButton(
+                            label: 'Kayıt Ol',
+                            isLoading: _isLoading,
+                            onPressed: _register,
+                          ),
+                          const SizedBox(height: Spacing.lg),
+
+                          // Ayırıcı
+                          Row(
+                            children: [
+                              Expanded(child: Divider(color: context.ct.surfaceBorder)),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+                                child: Text('veya',
+                                    style: TextStyle(
+                                        color: context.ct.textHint, fontSize: 13)),
+                              ),
+                              Expanded(child: Divider(color: context.ct.surfaceBorder)),
+                            ],
+                          ),
+                          const SizedBox(height: Spacing.lg),
+
+                          // Google ile Kayıt
+                          SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: OutlinedButton(
+                              onPressed: _isGoogleLoading ? null : _registerWithGoogle,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: context.ct.textPrimary,
+                                side: BorderSide(color: context.ct.surfaceBorder),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(AppRadius.lg)),
+                              ),
+                              child: _isGoogleLoading
+                                  ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2.5, color: AppColors.primary),
+                                    )
+                                  : const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        _GoogleIcon(),
+                                        SizedBox(width: 10),
+                                        Text('Google ile Kayıt Ol',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.w600, fontSize: 15)),
+                                      ],
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: Spacing.xxl),
+
+                          // Login link
+                          Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text('Zaten hesabın var mı? ', style: TextStyle(color: context.ct.textTertiary, fontSize: 14)),
+                                GestureDetector(
+                                  onTap: () => Navigator.pop(context),
+                                  child: const Text('Giriş Yap', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 14)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: Spacing.huge),
+                        ],
+                      ),
                     ),
-                    elevation: 6,
-                    shadowColor: Colors.black87,
-                  ),
-                  child: const Text(
-                    'Kayıt Ol',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context); // login sayfasına geri dön
-                  },
-                  child: const Text(
-                    'Zaten hesabın var mı? Giriş Yap',
-                    style: TextStyle(color: Colors.white70),
                   ),
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildInputField({
-    required String label,
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    bool isPassword = false,
-    bool isObscure = false,
-    VoidCallback? onToggleVisibility,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: Colors.white70)),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          obscureText: isPassword ? isObscure : false,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: Colors.white54),
-            suffixIcon: isPassword
-                ? IconButton(
-              icon: Icon(
-                isObscure ? Icons.visibility_off : Icons.visibility,
-                color: Colors.white54,
+  Widget _buildRoleTab(String role, String label, IconData icon) {
+    final isSelected = _selectedRole == role;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedRole = role),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: Spacing.lg),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadius.md + 2),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 20, color: isSelected ? Colors.white : context.ct.textTertiary),
+              const SizedBox(width: Spacing.sm),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : context.ct.textTertiary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
               ),
-              onPressed: onToggleVisibility,
-            )
-                : null,
-            filled: true,
-            fillColor: const Color(0xFF2C2C2C),
-            hintText: hint,
-            hintStyle: const TextStyle(color: Colors.grey),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide.none,
-            ),
+            ],
           ),
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _GoogleIcon extends StatelessWidget {
+  const _GoogleIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+      child: const Center(
+        child: Text(
+          'G',
+          style: TextStyle(
+            color: Color(0xFF4285F4),
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            height: 1,
+          ),
+        ),
+      ),
     );
   }
 }

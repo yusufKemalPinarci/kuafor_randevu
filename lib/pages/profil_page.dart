@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:kuafor_randevu/pages/shop_selection_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../core/app_theme.dart';
+import '../core/app_widgets.dart';
 import '../providers/shop_provider.dart';
 import '../providers/user_provider.dart';
+import '../services/firebase_auth_service.dart';
+import '../services/notification_service.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -13,219 +15,204 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  String userName = '';
-  String userEmail = '';
-  String userPhone = '';
-  bool isEmailVerified = true;
-  bool isPhoneVerified = true;
-  bool isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-  }
-
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
     final user = userProvider.user;
 
-    final hasShop = user?.shopId != "";
-    final userName = user?.name ?? '';
+    final hasShop = user?.shopId != null && user!.shopId!.trim().isNotEmpty;
+    final userName = user?.name ?? 'Kullanıcı';
     final userEmail = user?.email ?? '';
-    final userPhone = user?.phone?? ''; // Eğer phoneNumber alanı varsa
+    final userPhone = user?.phone ?? 'Belirtilmedi';
     final isEmailVerified = user?.isEmailVerified ?? false;
     final isPhoneVerified = user?.isPhoneVerified ?? false;
-    isLoading = false;
+    final userRole = user?.role ?? '';
 
-    print("bu adam ${userProvider.user}");
-    if (isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF1F1F1F),
-        body: Center(child: CircularProgressIndicator()),
+    if (user == null) {
+      return Scaffold(
+        backgroundColor: context.ct.bg,
+        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
       );
     }
+
     return Scaffold(
-      backgroundColor: const Color(0xFF1F1F1F),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1F1F1F),
-        title: const Text('Profil', style: TextStyle(color: Colors.white)),
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _buildSectionTitle('Kullanıcı Bilgileri'),
-                const SizedBox(height: 8),
-                _buildUserInfoCard('Ad Soyad', userName),
-                _buildUserInfoCard('E-Posta', userEmail, verified: isEmailVerified),
-                _buildUserInfoCard('Telefon', userPhone, verified: isPhoneVerified),
+      backgroundColor: context.ct.bg,
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            // Header
+            SliverToBoxAdapter(
+              child: AppPageHeader(title: 'Profil'),
+            ),
 
-                const SizedBox(height: 24),
-                if (!isEmailVerified || !isPhoneVerified)
-                  _buildSectionTitle('Doğrulama'),
-
-                const SizedBox(height: 8),
-                if (!isEmailVerified)
-                  _buildActionButton(
-                    icon: Icons.email_outlined,
-                    label: 'E-Postayı Doğrula',
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => AlertDialog(
-                          title: const Text("Doğrulama Maili Gönderildi"),
-                          content: const Text("Lütfen e-posta kutunuzu kontrol edin."),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text("Tamam"),
-                            ),
-                          ],
+            // Profile Card
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(Spacing.xxl, Spacing.xxl, Spacing.xxl, 0),
+                child: Container(
+                  padding: const EdgeInsets.all(Spacing.xxl),
+                  decoration: BoxDecoration(
+                    color: context.ct.surface,
+                    borderRadius: BorderRadius.circular(AppRadius.xxl),
+                    border: Border.all(color: context.ct.surfaceBorder.withAlpha(80)),
+                  ),
+                  child: Column(
+                    children: [
+                      AppAvatar(letter: userName, size: 80),
+                      const SizedBox(height: Spacing.lg),
+                      Text(userName, style: TextStyle(color: context.ct.textPrimary, fontSize: 22, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: Spacing.xs),
+                      Text(userEmail, style: TextStyle(color: context.ct.textSecondary, fontSize: 14)),
+                      if (userPhone.isNotEmpty && userPhone != 'Belirtilmedi') ...[
+                        const SizedBox(height: 2),
+                        Text(userPhone, style: TextStyle(color: context.ct.textTertiary, fontSize: 13)),
+                      ],
+                      const SizedBox(height: Spacing.md),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: Spacing.md + 2, vertical: Spacing.xs + 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withAlpha(18),
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
                         ),
-                      );
-                    },
-                  ),
-                if (!isPhoneVerified)
-                  _buildActionButton(
-                    icon: Icons.phone_android_outlined,
-                    label: 'Telefonu Doğrula',
-                    onTap: () {
-                      Navigator.pushReplacementNamed(context, '/phone_verification_page');
-                    },
-                  ),
-
-                const SizedBox(height: 24),
-                _buildSectionTitle('İşlemler'),
-                const SizedBox(height: 8),
-                _buildActionButton(
-                  icon: Icons.access_time,
-                  label: 'Çalışma Saatlerini Ayarla',
-                  enabled: true,
-                  onTap: () {
-                    if (isEmailVerified && isPhoneVerified && hasShop) {
-                      print (hasShop);
-                      Navigator.pushNamed(context, '/working-hours');
-                    } else {
-                      String message = '';
-                      if (!isEmailVerified && !isPhoneVerified && !hasShop) {
-                        message = 'E-posta ve telefon doğrulaması yapmalı, ayrıca bir dükkanınız olmalıdır.';
-                      } else if (!isEmailVerified && !isPhoneVerified) {
-                        print ("dükkan var mı ${user?.shopId} ${hasShop}");
-                        message = 'E-posta ve telefon doğrulaması yapmalısınız.';
-                      } else if (!isEmailVerified) {
-                        message = 'E-posta doğrulaması yapmalısınız.';
-                      } else if (!isPhoneVerified) {
-                        message = 'Telefon doğrulaması yapmalısınız.';
-                      } else if (!hasShop) {
-                        message = 'Öncelikle bir dükkan oluşturmalı veya seçmelisiniz.';
-                      }
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(message)),
-                      );
-                    }
-                  },
-                ),
-                hasShop
-                    ? _buildActionButton(
-                  icon: Icons.info_outline,
-                  label: 'Dükkan Bilgilerini Görüntüle',
-                  enabled: true,
-                  onTap: () => Navigator.pushNamed(context, '/shop_detail_page'),
-                )
-                    : Column(
-                  children: [
-                    _buildActionButton(
-                      icon: Icons.storefront_outlined,
-                      label: 'Dükkan Seç',
-                      enabled: true,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ShopSelectionPage(redirectToSuccessPage: false),
+                        child: Text(
+                          userRole == 'Barber' ? '✂️ Berber' : '👤 Müşteri',
+                          style: const TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.w600),
                         ),
                       ),
+                      if (isEmailVerified && isPhoneVerified) ...[
+                        const SizedBox(height: Spacing.sm + 2),
+                        const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.verified, color: AppColors.success, size: 16),
+                            SizedBox(width: 4),
+                            Text('Doğrulanmış Hesap', style: TextStyle(color: AppColors.success, fontSize: 12)),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Verification Alerts
+            if (!isEmailVerified || !isPhoneVerified)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(Spacing.xxl, Spacing.lg, Spacing.xxl, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('EYLEM BEKLİYOR', style: TextStyle(color: context.ct.textTertiary, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                      const SizedBox(height: Spacing.sm + 2),
+                      if (!isEmailVerified) _buildAlertTile(Icons.email_outlined, 'E-postayı Doğrula', AppColors.warning, () async {
+                        final error = await FirebaseAuthService().sendEmailVerification();
+                        if (!mounted) return;
+                        if (error != null) {
+                          showAppSnackBar(context, error, isError: true);
+                        } else {
+                          showAppSnackBar(context, 'Doğrulama e-postası gönderildi. Gelen kutunuzu kontrol edin.');
+                        }
+                      }),
+                      if (!isPhoneVerified) _buildAlertTile(Icons.phone_android, 'Telefonu Doğrula', AppColors.warning, () {
+                        Navigator.pushNamed(context, '/phone_verification_page');
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+
+            // Menu Items
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(Spacing.xxl, Spacing.xxl, Spacing.xxl, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('HESAP VE YÖNETİM', style: TextStyle(color: context.ct.textTertiary, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                    const SizedBox(height: Spacing.sm + 2),
+
+                    if (userRole == 'Barber') ...[
+                      AppMenuItem(icon: Icons.content_cut, label: 'Hizmetlerim', onTap: () => Navigator.pushNamed(context, '/service_management')),
+                      AppMenuItem(icon: Icons.access_time_rounded, label: 'Çalışma Saatleri', onTap: () {
+                        if (hasShop) {
+                          Navigator.pushNamed(context, '/working-hours');
+                        } else {
+                          showAppSnackBar(context, 'Çalışma saatlerini düzenlemek için önce bir dükkana katılın veya yeni bir dükkan oluşturun.', isError: true);
+                        }
+                      }),
+                      if (hasShop)
+                        AppMenuItem(icon: Icons.storefront_outlined, label: 'Dükkan Bilgileri', onTap: () => Navigator.pushNamed(context, '/shop_detail_page')),
+                      if (hasShop)
+                        AppMenuItem(icon: Icons.workspace_premium, label: 'Abonelik', onTap: () => Navigator.pushNamed(context, '/subscription')),
+                    ],
+
+                    const SizedBox(height: Spacing.lg),
+                    AppMenuItem(
+                      icon: Icons.settings_outlined,
+                      label: 'Ayarlar',
+                      onTap: () => Navigator.pushNamed(context, '/settings'),
                     ),
-                    _buildActionButton(
-                      icon: Icons.add_business_outlined,
-                      label: 'Yeni Dükkan Oluştur',
-                      enabled: true,
-                      onTap: () => Navigator.pushNamed(context, '/create-shop-page'),
+                    const SizedBox(height: Spacing.xxl),
+                    AppMenuItem(
+                      icon: Icons.logout_rounded,
+                      label: 'Çıkış Yap',
+                      isDestructive: true,
+                      onTap: () async {
+                        final userProvider = Provider.of<UserProvider>(context, listen: false);
+                        final shopProvider = Provider.of<ShopProvider>(context, listen: false);
+
+                        // FCM token sil
+                        final jwt = userProvider.user?.jwtToken;
+                        if (jwt != null && jwt.isNotEmpty) {
+                          await NotificationService().removeTokenFromServer(jwt);
+                        }
+
+                        await userProvider.logout();
+                        await shopProvider.clearShop();
+                        if (!context.mounted) return;
+                        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                      },
                     ),
+
+                    const SizedBox(height: Spacing.xxxl),
                   ],
                 ),
-              ],
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 20),
-            child: TextButton.icon(
-              onPressed: () async{
-                final userProvider = Provider.of<UserProvider>(context, listen: false);
-                final shopProvider = Provider.of<ShopProvider>(context, listen: false);
-                final prefs = await SharedPreferences.getInstance();
-                print("user bilgisi");
-                print(prefs.getString('user'));
-
-                await userProvider.logout();
-                await shopProvider.clearShop(); // temizle
-
-                if (!mounted) return;
-                Navigator.pushNamed(context, '/login');
-              },
-              icon: const Icon(Icons.logout, color: Colors.redAccent),
-              label: const Text('Çıkış Yap', style: TextStyle(color: Colors.redAccent)),
-            ),
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUserInfoCard(String title, String value, {bool verified = true}) {
-    return Card(
-      color: const Color(0xFF2C2C2C),
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      child: ListTile(
-        title: Text(title, style: const TextStyle(color: Colors.white70)),
-        subtitle: Text(value, style: const TextStyle(color: Colors.white)),
-        trailing: verified
-            ? const Icon(Icons.verified, color: Colors.green, size: 20)
-            : const Icon(Icons.warning, color: Colors.orangeAccent, size: 20),
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    bool enabled = true,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: ElevatedButton.icon(
-        onPressed: enabled ? onTap : null,
-        icon: Icon(icon),
-        label: Text(label),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: enabled ? const Color(0xFFC69749) : Colors.grey.shade700,
-          foregroundColor: Colors.black,
-          minimumSize: const Size(double.infinity, 50),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String text) {
-    return Text(
-      text,
-      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+  Widget _buildAlertTile(IconData icon, String title, Color color, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Spacing.sm + 2),
+      child: Material(
+        color: color.withAlpha(12),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: Spacing.lg + 2, vertical: Spacing.md + 2),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: color.withAlpha(35)),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: color, size: 22),
+                const SizedBox(width: Spacing.md + 2),
+                Expanded(child: Text(title, style: TextStyle(color: color, fontSize: 15, fontWeight: FontWeight.w600))),
+                Icon(Icons.arrow_forward_ios, color: color.withAlpha(120), size: 14),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Release build ağ güvenlik yapılandırması.
+    Debug build'de src/debug/res/xml/network_security_config.xml geçerlidir.
+-->
+<network-security-config>
+
+    <!-- Production domain: cleartext yasak, sertifika pinleme -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">travelwithstudents.xyz</domain>
+        <!--
+            Pin hash'leri yenileme:
+              openssl s_client -connect travelwithstudents.xyz:443 \
+                -servername travelwithstudents.xyz < /dev/null 2>/dev/null \
+                | openssl x509 -pubkey -noout \
+                | openssl pkey -pubin -outform der \
+                | openssl dgst -sha256 -binary \
+                | openssl enc -base64
+
+            Sertifika yenilendiğinde (Let's Encrypt ~90 gün) ikinci pin
+            (ISRG Root X1) sayesinde uygulama çalışmaya devam eder.
+            Yeni sertifikanın SPKI hash'ini alıp ilk pin'i güncelleyin.
+            Expiration tarihinden sonra pin-set devre dışı kalır (graceful).
+        -->
+        <pin-set expiration="2026-09-01">
+            <!-- Aktif sertifika SPKI SHA-256 hash'i -->
+            <pin digest="SHA-256">iFUMhH19l7RlD77qQBsTcZORWsG/BjDzSMd9+UDsflY=</pin>
+            <!-- Yedek: ISRG Root X1 (Let's Encrypt root CA) -->
+            <pin digest="SHA-256">C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=</pin>
+        </pin-set>
+    </domain-config>
+
+    <!-- Diğer tüm domain'ler: cleartext yasak, sistem CA'larına güven -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+</network-security-config>

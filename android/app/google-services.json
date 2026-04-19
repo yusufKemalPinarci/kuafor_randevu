@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "175321915841",
+    "project_id": "berber-8ebcf",
+    "storage_bucket": "berber-8ebcf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:175321915841:android:38c36384a9bcdf1e07cf40",
+        "android_client_info": {
+          "package_name": "com.kuaflex.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "175321915841-kpthet5kol0dbk6dmsdhfitgoijs54p5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kuaflex.app",
+            "certificate_hash": "cb56b3101ddeca5593c38625f5dbb25f26b73b22"
+          }
+        },
+        {
+          "client_id": "175321915841-39v7n60q2qvrc0ic8jdt5kceh76v1fli.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAjT8sVDTHNcKbnP8RKa50uGNUeZmjTaQU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "175321915841-39v7n60q2qvrc0ic8jdt5kceh76v1fli.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

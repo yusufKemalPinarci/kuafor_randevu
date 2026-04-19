@@ -43,3 +43,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Hassas imzalama ve ortam dosyaları — kesinlikle commit etme
+android/key.properties
+android/local.properties
+*.keystore
+*.jks
+
+# Node.js API — gizli anahtarlar ve ortam değişkenleri
+node.js-api-main/.env
+node.js-api-main/serviceAccountKey.json

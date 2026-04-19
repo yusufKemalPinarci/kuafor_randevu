@@ -1,6 +1,6 @@
 {
-    "name": "kuafor_randevu",
-    "short_name": "kuafor_randevu",
+    "name": "KuaFlex",
+    "short_name": "KuaFlex",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

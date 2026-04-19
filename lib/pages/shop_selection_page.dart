@@ -1,12 +1,12 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
-import '../models/adress_model.dart';
 import '../models/shop_model.dart';
 import '../providers/user_provider.dart';
-import '../services/user_service.dart';
+import '../services/shop_service.dart';
+import '../core/app_theme.dart';
+import '../core/app_widgets.dart';
 
 class ShopSelectionPage extends StatefulWidget {
   final bool redirectToSuccessPage;
@@ -18,166 +18,149 @@ class ShopSelectionPage extends StatefulWidget {
 }
 
 class _ShopSelectionPageState extends State<ShopSelectionPage> {
-  List<ShopModel> assignedShops = [];
-  String? _selectedShopId;
-  bool _isLoading = true;
+  final _codeController = TextEditingController();
+  bool _isLoading = false;
 
   @override
-  void initState() {
-    super.initState();
-    fetchAssignedShops();
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
   }
 
-  Future<void> fetchAssignedShops() async {
-    setState(() {
-      _isLoading = true;
-    });
+  Future<void> _joinShopWithCode() async {
+    final code = _codeController.text.trim();
+    if (code.isEmpty) {
+      showAppSnackBar(context, 'Lütfen dükkan davet kodunu giriniz.', isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
 
     try {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final user = userProvider.user;
 
-      if (user == null || user.email.isEmpty) {
-        throw Exception("Kullanıcı e-posta bilgisi eksik.");
+      if (user == null || user.jwtToken == null) {
+        throw Exception("Oturum bilgisi bulunamadı. Lütfen tekrar giriş yapın.");
       }
 
-      final url = Uri.parse('https://node-js-api-8m2g.onrender.com/api/shop/by-staff-email?email=${Uri.encodeComponent(user.email)}');
-      final response = await http.get(url);
+      final shopService = ShopService();
+      final responseMap = await shopService.joinShop(code, user.jwtToken!);
 
-      if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
-        final List<ShopModel> fetchedShops = jsonList.map((json) => ShopModel.fromJson(json)).toList();
+      final shopJson = responseMap["shop"];
+      final userJson = responseMap["user"];
 
-        setState(() {
-          assignedShops = fetchedShops;
-          _isLoading = false;
-        });
+      if (shopJson == null || userJson == null) {
+        throw Exception("Dükkana katılırken bir sorun oluştu. Lütfen tekrar deneyin.");
+      }
+
+      final joinedShop = ShopModel.fromJson(shopJson);
+
+      final updatedUser = user.copyWith(
+        selectedShop: joinedShop,
+        shopId: joinedShop.id,
+      );
+      userProvider.setUser(updatedUser);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('selectedShop', jsonEncode(joinedShop.toJson()));
+      await prefs.setString('user', jsonEncode(updatedUser.toJson()));
+
+      if (!mounted) return;
+      if (widget.redirectToSuccessPage) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const RegistrationSuccessPage()),
+        );
       } else {
-        throw Exception("Sunucu hatası: ${response.statusCode}");
+        Navigator.pop(context, true);
       }
     } catch (e) {
-      print("Dükkanlar alınamadı: $e");
-      setState(() {
-        assignedShops = [];
-        _isLoading = false;
-      });
-    }
-  }
-
-
-  Future<void> _onShopSelected(ShopModel shop) async {
-    setState(() {
-      _selectedShopId = shop.id;
-    });
-
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final user = userProvider.user;
-
-    if (user == null || user.jwtToken == null) {
-      print("Kullanıcı ya da token yok");
-      return;
-    }
-
-    // 1. API'ye kaydet
-    final userService = UserService(baseUrl: 'https://node-js-api-8m2g.onrender.com');
-    final updatedUserFromApi = await userService.selectShop(
-      jwtToken: user.jwtToken!,
-      shopId: shop.id,
-    );
-
-
-    if (updatedUserFromApi == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Dükkan seçimi API'de başarısız oldu")),
-      );
-      return;
-    }
-
-    // 2. Provider'ı güncelle
-    final updatedUser = updatedUserFromApi.copyWith(
-      selectedShop: shop,
-    );
-    userProvider.setUser(updatedUser);
-
-    // 3. SharedPreferences güncelle
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('selectedShop', jsonEncode(shop.toJson()));
-
-    // 4. Yönlendirme
-    if (!mounted) return;
-    if (widget.redirectToSuccessPage) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const RegistrationSuccessPage()),
-      );
-    } else {
-      Navigator.pushReplacementNamed(context, '/profile_page');
+      final msg = e.toString().replaceAll('Exception: ', '');
+      showAppSnackBar(context, msg.isNotEmpty ? msg : 'Bir sorun oluştu. Lütfen tekrar deneyin.', isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1F1F1F),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1F1F1F),
-        title: const Text("Dükkan Seç", style: TextStyle(color: Colors.white)),
-        centerTitle: true,
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFC69749)))
-          : assignedShops.isEmpty
-          ? const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24.0),
-          child: Text(
-            "Size atanmış dükkan bulunamadı.\n\n"
-                "Eğer oluşturulan dükkana katılmak istiyorsanız, dükkanı oluşturan kişiden "
-                "çalışan alanına sizin e-posta adresinizi girmesini isteyiniz. "
-                "O zaman listede dükkanı görebileceksiniz.",
-            style: TextStyle(color: Colors.white70, fontSize: 18),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      )
-          : ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-        itemCount: assignedShops.length,
-        itemBuilder: (context, index) {
-          final shop = assignedShops[index];
-          final isSelected = shop.id == _selectedShopId;
+      body: SafeArea(
+        child: Column(
+          children: [
+            AppPageHeader(title: 'Dükkana Katıl'),
+            Expanded(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: Spacing.xxl, vertical: Spacing.xxxl),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // ── Icon ──
+                      Container(
+                        width: 96,
+                        height: 96,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withAlpha(15),
+                          borderRadius: BorderRadius.circular(Spacing.xxxl),
+                          border: Border.all(color: AppColors.primary.withAlpha(30)),
+                        ),
+                        child: const Icon(Icons.storefront_rounded, size: 48, color: AppColors.primary),
+                      ),
+                      const SizedBox(height: Spacing.xxl),
 
-          return GestureDetector(
-            onTap: () => _onShopSelected(shop),
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 8),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFFC69749) : const Color(0xFF2C2C2C),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: isSelected
-                    ? [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  )
-                ]
-                    : null,
-              ),
-              child: Text(
-                shop.name,
-                style: TextStyle(
-                  color: isSelected ? Colors.black : Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
+                      Text(
+                        'Dükkan Davet Kodunuzu Girin',
+                        style: Theme.of(context).textTheme.headlineMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: Spacing.md),
+                      Text(
+                        'Dükkan sahibinin size verdiği 6 haneli davet kodunu girerek dükkana katılabilirsiniz.',
+                        style: TextStyle(color: context.ct.textSecondary, fontSize: 14, height: 1.5),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: Spacing.huge),
+
+                      // ── Code Input ──
+                      TextField(
+                        controller: _codeController,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: context.ct.textPrimary,
+                          fontSize: 24,
+                          letterSpacing: 6,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: InputDecoration(
+                          hintText: 'ÖRN: A8B2X9',
+                          hintStyle: TextStyle(
+                            color: context.ct.textHint,
+                            letterSpacing: 0,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(vertical: Spacing.xxl),
+                        ),
+                      ),
+                      const SizedBox(height: Spacing.xxxl),
+
+                      AppLoadingButton(
+                        label: 'Katıl',
+                        icon: Icons.login_rounded,
+                        isLoading: _isLoading,
+                        onPressed: _joinShopWithCode,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
@@ -189,43 +172,40 @@ class RegistrationSuccessPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1F1F1F),
       body: SafeArea(
         child: Center(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.symmetric(horizontal: Spacing.xxxl),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.check_circle_outline, size: 100, color: Color(0xFFC69749)),
-                const SizedBox(height: 24),
-                const Text(
-                  "Her şey hazır!",
-                  style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: context.ct.successSoft,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.success.withAlpha(30)),
+                  ),
+                  child: const Icon(Icons.check_rounded, size: 52, color: AppColors.success),
+                ),
+                const SizedBox(height: Spacing.xxl),
+                Text(
+                  'Her şey hazır!',
+                  style: Theme.of(context).textTheme.headlineLarge,
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  "Kayıt işlemi başarılı.",
-                  style: TextStyle(color: Colors.white70, fontSize: 18),
+                const SizedBox(height: Spacing.md),
+                Text(
+                  'Kayıt işlemi başarılı.',
+                  style: TextStyle(color: context.ct.textSecondary, fontSize: 18),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 40),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushReplacementNamed(context, '/login');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFC69749),
-                    minimumSize: const Size(double.infinity, 55),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    elevation: 6,
-                    shadowColor: Colors.black87,
-                  ),
-                  child: const Text(
-                    "Giriş Sayfasına Git",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
+                const SizedBox(height: Spacing.huge),
+                AppLoadingButton(
+                  label: 'Giriş Sayfasına Git',
+                  icon: Icons.arrow_forward_rounded,
+                  onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
                 ),
               ],
             ),

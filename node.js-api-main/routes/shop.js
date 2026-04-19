@@ -1,6 +1,7 @@
 const express = require('express');
 const Shop = require('../models/Shop');
 const { User } = require('../models/User');
+const { Subscription, SubscriptionStatus } = require('../models/Subscription');
 const authMiddleware = require('../middlewares/auth');
 const router = express.Router();
 
@@ -73,17 +74,22 @@ router.post('/',authMiddleware, async (req, res) => {
       openingHour,
       closingHour,
       workingDays,
-      staffEmails     // yeni alan
     } = req.body;
+    
     const ownerId = req.user._id; 
-    const owner = await User.findById(ownerId);
-    const ownerEmail = owner?.email;
-       // Sahip mailini staff listesine otomatik ekle
-    if (ownerEmail && !staffEmails.includes(ownerEmail)) {
-      staffEmails.push(ownerEmail);
+    
+    // Rastgele 6 haneli eşsiz kod üret (Örn: A8B2X9)
+    const generateCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
+    let shopCode = generateCode();
+    
+    // Kod çakışması çok düşük ihtimal ama yine de kontrol edelim
+    while(await Shop.findOne({ shopCode })) {
+      shopCode = generateCode();
     }
+
     const shop = new Shop({
       name,
+      shopCode,
       fullAddress,
       neighborhood,
       city,
@@ -93,61 +99,77 @@ router.post('/',authMiddleware, async (req, res) => {
       closingHour,
       workingDays,
       ownerId,
-      staffEmails
     });
 
     await shop.save();
-    res.status(201).json(shop);
+    
+    // Dükkanı kuran kişiyi otomatik olarak bu dükkana bağla
+    await User.findByIdAndUpdate(ownerId, { shopId: shop._id });
+
+    // Güncel User bilgisini de dönmek mantıklı
+    const updatedUser = await User.findById(ownerId);
+
+    res.status(201).json({ shop, user: updatedUser });
   } catch (err) {
    console.error('Shop create error:', err.message, err);
    res.status(500).json({ error: 'Something went wrong', details: err.message });
-
   }
 });
-
-
-
-
-
 
 /**
  * @swagger
- * /api/shop/by-staff-email:
- *   get:
- *     summary: Çalışana ait dükkanları listele
+ * /api/shop/join:
+ *   post:
+ *     summary: Davet kodu ile dükkana katıl
  *     tags: [Shop]
- *     parameters:
- *       - in: query
- *         name: email
- *         schema:
- *           type: string
- *         required: true
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               shopCode:
+ *                 type: string
  *     responses:
  *       200:
- *         description: Dükkanlar listelendi
- *       400:
- *         description: Email eksik
- *       500:
- *         description: Sunucu hatası
+ *         description: Dükkana başarıyla katılındı
+ *       404:
+ *         description: Geçersiz dükkan kodu
  */
-// Çalışana Ait Dükkanları listele      //berber için lazım
-// GET /api/shop/by-staff-email?email=test@example.com
-router.get('/by-staff-email', async (req, res) => {
+// Davet kodu ile dükkana katıl
+router.post('/join', authMiddleware, async (req, res) => {
   try {
-    const { email } = req.query;
-
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
+    const { shopCode } = req.body;
+    if (!shopCode) {
+      return res.status(400).json({ error: 'Shop code is required' });
     }
 
-    const shops = await Shop.find({ staffEmails: email });
+    // Koda göre dükkanı bul
+    const shop = await Shop.findOne({ shopCode: shopCode.toUpperCase() });
+    if (!shop) {
+      return res.status(404).json({ error: 'Bu koda sahip bir dükkan bulunamadı.' });
+    }
 
-    res.json(shops);
+    // Kullanıcının dükkanını güncelle
+    req.user.shopId = shop._id;
+    await req.user.save();
+
+    res.status(200).json({ message: 'Dükkana başarıyla katılındı', shop, user: req.user });
   } catch (err) {
-    console.error('Error fetching shops by staff email:', err);
-    res.status(500).json({ error: 'Something went wrong' });
+    console.error('Error joining shop:', err);
+    res.status(500).json({ error: 'Dükkana katılırken bir hata oluştu.' });
   }
 });
+
+
+
+
+
+
+// Eski /by-staff-email rotası kapatıldı. Çünkü artık staffEmails üzerinden ilişki kurmuyoruz.
 
 
 /**
@@ -170,6 +192,17 @@ router.get('/by-staff-email', async (req, res) => {
  *       500:
  *         description: Sunucu hatası
  */
+// Dükkanı shopCode ile getirme (public, deep link için)
+router.get('/by-code/:shopCode', async (req, res) => {
+  try {
+    const shop = await Shop.findOne({ shopCode: req.params.shopCode.toUpperCase() });
+    if (!shop) return res.status(404).json({ error: 'Dükkan bulunamadı.' });
+    res.status(200).json(shop);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 //Dükkanı id sine göre bilgilerini getirme   // hem müşteri hem berber tarafında lazım.
 router.get('/:id', async (req, res) => {
   try {
@@ -208,7 +241,7 @@ router.get('/:id', async (req, res) => {
  *       500:
  *         description: Sunucu hatası
  */
-// dükkanda çalışan kişileri listelemek için 
+// dükkanda çalışan kişileri listelemek için (Sadece shopId referansıyla çekilecek)
 router.get('/:shopId/staff', async (req, res) => {
   try {
     const shopId = req.params.shopId;
@@ -218,17 +251,11 @@ router.get('/:shopId/staff', async (req, res) => {
       return res.status(404).json({ error: 'Dükkan bulunamadı' });
     }
 
-    // Tüm e-posta adreslerini al (string filtrele)
-    const staffEmails = (shop.staffEmails || []).filter(email => typeof email === 'string');
-
-    // Bu e-posta adreslerine sahip ve rolü 'Barber' olan, shopId ile eşleşen kullanıcıları getir
-      const users = await User.find(
+    // Role Berber olan ve bu dükkana bağlı olan herkesi getir.
+    const users = await User.find(
       {
         role: 'Barber',
-        $or: [
-          { email: { $in: staffEmails } },
-          { shopId: shopId }
-        ]
+        shopId: shopId
       },
       '-passwordHash -__v'
     );
@@ -266,20 +293,59 @@ router.get('/:shopId/staff', async (req, res) => {
 // GET /api/shop/search?city=Istanbul&neighborhood=Kadikoy&district=Moda
 router.get('/search', async (req, res) => {
   try {
-    const { city, neighborhood} = req.query;
+    const { city, district, neighborhood } = req.query;
 
-    // Filtre objesi oluşturuyoruz, varsa ekliyoruz
     const filter = {};
-    if (city) filter.city = city;
-    if (neighborhood) filter.neighborhood = neighborhood;
+    if (city) filter.city = { $regex: new RegExp(city, 'i') };
+    if (district) filter.district = { $regex: new RegExp(district, 'i') };
+    if (neighborhood) filter.neighborhood = { $regex: new RegExp(neighborhood, 'i') };
 
-    // Filtreye göre Shop'ları getir
+    // Aktif aboneliği olan dükkanları filtrele
+    const now = new Date();
+    const activeSubscriptions = await Subscription.find({
+      status: SubscriptionStatus.ACTIVE,
+      endDate: { $gt: now },
+    }).select('shopId');
+    const activeShopIds = activeSubscriptions.map(s => s.shopId);
+    filter._id = { $in: activeShopIds };
+
     const shops = await Shop.find(filter);
-
     res.json(shops);
   } catch (err) {
     console.error('Error searching shops:', err);
     res.status(500).json({ error: 'Something went wrong' });
+  }
+});
+
+
+// Dükkanı güncelle
+router.put('/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const shop = await Shop.findById(id);
+    
+    if (!shop) {
+      return res.status(404).json({ error: 'Shop not found' });
+    }
+
+    // Only the owner can edit the shop
+    if (shop.ownerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Only the shop owner can edit this shop' });
+    }
+
+    const allowedFields = ['name', 'fullAddress', 'neighborhood', 'city', 'district', 'phone', 'adress', 'openingHour', 'closingHour', 'workingDays', 'autoConfirmAppointments'];
+    const updateFields = {};
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        updateFields[field] = req.body[field];
+      }
+    }
+
+    const updatedShop = await Shop.findByIdAndUpdate(id, updateFields, { new: true, runValidators: true });
+    res.json(updatedShop);
+  } catch (err) {
+    console.error('Shop update error:', err);
+    res.status(500).json({ error: 'Shop update failed', details: err.message });
   }
 });
 
@@ -297,10 +363,26 @@ router.get('/search', async (req, res) => {
  *         description: Sunucu hatası
  */
 
-// Tüm dükkanları getir (genel listeleme)    // Müşteri tarafında lazım
+// Tüm dükkanları getir (sadece aktif aboneliği olanlar)    // Müşteri tarafında lazım
 router.get('/', async (req, res) => {
   try {
-    const shops = await Shop.find();
+    const { city, district } = req.query;
+
+    // Aktif aboneliği olan dükkanların ID'lerini bul
+    const now = new Date();
+    const activeSubscriptions = await Subscription.find({
+      status: SubscriptionStatus.ACTIVE,
+      endDate: { $gt: now },
+    }).select('shopId');
+
+    const activeShopIds = activeSubscriptions.map(s => s.shopId);
+
+    const filter = { _id: { $in: activeShopIds } };
+    if (city) filter.city = { $regex: new RegExp(city, 'i') };
+    if (district) filter.district = { $regex: new RegExp(district, 'i') };
+
+    // Sadece aktif aboneliği olan dükkanları getir
+    const shops = await Shop.find(filter);
     res.json(shops);
   } catch (err) {
     console.error('Error fetching all shops:', err);
@@ -310,64 +392,7 @@ router.get('/', async (req, res) => {
 
 
 
-/**
- * @swagger
- * /api/shop/{id}/add-staff:
- *   put:
- *     summary: Dükkan çalışanı ekle
- *     tags: [Shop]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *     responses:
- *       200:
- *         description: Çalışan eklendi
- *       400:
- *         description: Hatalı giriş
- *       500:
- *         description: Sunucu hatası
- */
-//dükkana çalışan ekleme          // Dükkan sahibi tarafında lazım.
-// PUT /api/shop/:id/add-staff
-router.put('/:id/add-staff', async (req, res) => {
-  try {
-    let { email } = req.body;
-    email = email.toLowerCase(); // artık hata yok
-
-    if (!email) {
-      return res.status(400).json({ message: 'Email is required' });
-    }
-
-    const shop = await Shop.findById(req.params.id);
-    if (!shop) {
-      return res.status(404).json({ message: 'Shop not found' });
-    }
-
-    if (shop.staffEmails.includes(email)) {
-      return res.status(400).json({ message: 'This email is already added as staff.' });
-    }
-
-    shop.staffEmails.push(email);
-    await shop.save();
-
-    res.status(200).json({ message: 'Staff added successfully', shop });
-  } catch (error) {
-    console.error('Error adding staff:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-});
+// Eski /:id/add-staff (email ekeleme) rotası yeni yapıda gerekmediği için kaldırıldı.
 
 
 

@@ -41,7 +41,7 @@ class VerificationRequiredPage extends StatelessWidget {
                 elevation: 5,
               ),
               onPressed: () {
-                Navigator.pushNamed(context, '/profile');
+                Navigator.pushNamed(context, '/profile_page');
               },
               child: const Text(
                 'Doğrulama Sayfasına Git',

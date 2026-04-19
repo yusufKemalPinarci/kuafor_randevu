@@ -1,6 +1,6 @@
-# kuafor_randevu
+# KuaFlex
 
-A new Flutter project.
+KuaFlex - Kuaför Randevu Uygulaması
 
 ## Getting Started
 

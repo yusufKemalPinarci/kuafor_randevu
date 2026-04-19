@@ -1,6 +1,14 @@
-import 'package:flutter/material.dart';
-import 'package:kuafor_randevu/pages/appointment_detail_page.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:kuaflex/pages/appointment_detail_page.dart';
+import 'dart:convert';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:provider/provider.dart';
+
+import '../core/app_theme.dart';
+import '../core/app_widgets.dart';
+import '../providers/user_provider.dart';
+import '../services/api_client.dart';
 
 class AllAppointmentsPage extends StatefulWidget {
   const AllAppointmentsPage({super.key});
@@ -12,18 +20,67 @@ class AllAppointmentsPage extends StatefulWidget {
 class _AllAppointmentsPageState extends State<AllAppointmentsPage> {
   DateTime _selectedDay = DateTime.now();
 
-  // Örnek randevular - tarih string olarak yyyy-MM-dd formatında
-  final Map<String, List<Map<String, String>>> _appointments = {
-    '2025-08-05': [
-      {'customer': 'Ahmet Yılmaz', 'time': '10:00'},
-      {'customer': 'Mehmet Kaya', 'time': '11:30'},
-    ],
-    '2025-08-06': [
-      {'customer': 'Ayşe Demir', 'time': '14:00'},
-    ],
-  };
+  Map<String, List<Map<String, dynamic>>> _appointments = {};
+  bool _isLoading = true;
 
-  List<Map<String, String>> get _selectedDayAppointments {
+  @override
+  void initState() {
+    super.initState();
+    _fetchAppointments();
+  }
+
+  Future<void> _fetchAppointments() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final token = userProvider.user?.jwtToken;
+      if (token == null) return;
+
+      final response = await ApiClient().get('/api/appointment/my_berber');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        
+        final Map<String, List<Map<String, dynamic>>> groupedAppointments = {};
+
+        for (var appt in data) {
+          final dateStr = appt['date'];
+          if (dateStr == null) continue;
+
+          String formattedTime = '';
+          if (appt['startTime'] != null) {
+            final startTime = DateTime.parse(appt['startTime']).toLocal();
+            formattedTime = "${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}";
+          }
+
+          final mappedAppt = {
+            'id': appt['_id'],
+            'customer': appt['customerName'] ?? 'Bilinmeyen Müşteri',
+            'time': formattedTime,
+            'phone': appt['customerPhone'] ?? '-',
+            'date': dateStr,
+            'status': appt['status'] ?? 'pending',
+            'notes': appt['notes'] ?? '',
+          };
+
+          if (groupedAppointments.containsKey(dateStr)) {
+            groupedAppointments[dateStr]!.add(mappedAppt);
+          } else {
+            groupedAppointments[dateStr] = [mappedAppt];
+          }
+        }
+
+        setState(() => _appointments = groupedAppointments);
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('Tüm randevuları çekerken hata: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  List<Map<String, dynamic>> get _selectedDayAppointments {
     final key = _selectedDay.toIso8601String().substring(0, 10);
     return _appointments[key] ?? [];
   }
@@ -31,113 +88,159 @@ class _AllAppointmentsPageState extends State<AllAppointmentsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1F1F1F),
-      appBar: AppBar(
-        title: const Text('Tüm Randevular'),
-        backgroundColor: const Color(0xFF1F1F1F),
-        elevation: 0,
-        foregroundColor: Colors.white,
-      ),
-      body: Column(
-        children: [
-          TableCalendar(
-            firstDay: DateTime.now().subtract(const Duration(days: 365)),
-            lastDay: DateTime.now().add(const Duration(days: 365)),
-            focusedDay: _selectedDay,
-            calendarStyle: const CalendarStyle(
-              todayDecoration: BoxDecoration(
-                color: Color(0xFFC69749),
-                shape: BoxShape.circle,
-              ),
-              selectedDecoration: BoxDecoration(
-                color: Color(0xFFC69749),
-                shape: BoxShape.circle,
-              ),
-              todayTextStyle: TextStyle(color: Colors.white),
-              selectedTextStyle: TextStyle(color: Colors.white),
-            ),
-            headerStyle: const HeaderStyle(
-              formatButtonVisible: false,
-              titleCentered: true,
-              titleTextStyle: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-              leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
-              rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
-            ),
-            onDaySelected: (selectedDay, focusedDay) {
-              setState(() {
-                _selectedDay = selectedDay;
-              });
-            },
-            selectedDayPredicate: (day) {
-              return isSameDay(day, _selectedDay);
-            },
-            calendarBuilders: CalendarBuilders(
-              dowBuilder: (context, day) {
-                final text = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][day.weekday % 7];
-                return Center(
-                  child: Text(text, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
-                );
-              },
-            ),
-            daysOfWeekHeight: 30,
-            daysOfWeekStyle: const DaysOfWeekStyle(
-              weekdayStyle: TextStyle(color: Colors.white70),
-              weekendStyle: TextStyle(color: Colors.white70),
-            ),
-            calendarFormat: CalendarFormat.month,
-            startingDayOfWeek: StartingDayOfWeek.monday,
-            availableGestures: AvailableGestures.all,
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: _selectedDayAppointments.isEmpty
-                ? const Center(
-              child: Text(
-                'Seçilen gün için randevu yok',
-                style: TextStyle(color: Colors.white70, fontSize: 16),
-              ),
-            )
-                : ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: _selectedDayAppointments.length,
-              itemBuilder: (context, index) {
-                final appt = _selectedDayAppointments[index];
-                return Card(
-                  color: const Color(0xFF2C2C2C),
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  child: ListTile(
-                    title: Text(
-                      appt['customer']!,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      body: SafeArea(
+        child: Column(
+          children: [
+            AppPageHeader(title: 'Tüm Randevular'),
+            if (_isLoading)
+              const Expanded(child: Center(child: CircularProgressIndicator()))
+            else ...[
+              // ── Calendar ──
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+                decoration: BoxDecoration(
+                  color: context.ct.surface,
+                  borderRadius: BorderRadius.circular(AppRadius.xl),
+                  border: Border.all(color: context.ct.surfaceBorder.withAlpha(80)),
+                ),
+                child: TableCalendar(
+                  firstDay: DateTime.now().subtract(const Duration(days: 365)),
+                  lastDay: DateTime.now().add(const Duration(days: 365)),
+                  focusedDay: _selectedDay,
+                  calendarStyle: CalendarStyle(
+                    todayDecoration: BoxDecoration(
+                      color: AppColors.primary.withAlpha(40),
+                      shape: BoxShape.circle,
                     ),
-                    subtitle: Text(
-                      appt['time']!,
-                      style: const TextStyle(color: Colors.white70),
+                    todayTextStyle: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
+                    selectedDecoration: const BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
                     ),
-                    trailing: const Icon(Icons.arrow_forward_ios, color: Color(0xFFC69749)),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AppointmentDetailPage(
-                            appointment: {
-                              'customer': appt['customer'],
-                              'date': '2025-08-05', // uygun şekilde gün/datalar
-                              'time': appt['time'],
-                            },
-                          ),
-                        ),
+                    selectedTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                    defaultTextStyle: TextStyle(color: context.ct.textPrimary),
+                    weekendTextStyle: TextStyle(color: context.ct.textSecondary),
+                    outsideTextStyle: TextStyle(color: context.ct.textHint),
+                    cellMargin: const EdgeInsets.all(3),
+                  ),
+                  headerStyle: HeaderStyle(
+                    formatButtonVisible: false,
+                    titleCentered: true,
+                    titleTextStyle: TextStyle(color: context.ct.textPrimary, fontSize: 16, fontWeight: FontWeight.w700),
+                    leftChevronIcon: Icon(Icons.chevron_left_rounded, color: context.ct.textSecondary),
+                    rightChevronIcon: Icon(Icons.chevron_right_rounded, color: context.ct.textSecondary),
+                    headerPadding: EdgeInsets.symmetric(vertical: Spacing.md),
+                  ),
+                  onDaySelected: (selectedDay, focusedDay) {
+                    setState(() => _selectedDay = selectedDay);
+                  },
+                  selectedDayPredicate: (day) => isSameDay(day, _selectedDay),
+                  calendarBuilders: CalendarBuilders(
+                    dowBuilder: (context, day) {
+                      final text = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][day.weekday % 7];
+                      return Center(
+                        child: Text(text, style: TextStyle(color: context.ct.textTertiary, fontWeight: FontWeight.w600, fontSize: 12)),
                       );
-
-                      // Randevu detay sayfasına git
                     },
                   ),
-                );
-              },
+                  daysOfWeekHeight: 30,
+                  daysOfWeekStyle: DaysOfWeekStyle(
+                    weekdayStyle: TextStyle(color: context.ct.textTertiary),
+                    weekendStyle: TextStyle(color: context.ct.textTertiary),
+                  ),
+                  calendarFormat: CalendarFormat.month,
+                  startingDayOfWeek: StartingDayOfWeek.monday,
+                  availableGestures: AvailableGestures.all,
+                ),
+              ),
+              const SizedBox(height: Spacing.lg),
+
+              // ── Appointment List ──
+              Expanded(
+                child: _selectedDayAppointments.isEmpty
+                    ? AppEmptyState(
+                        icon: Icons.event_busy_rounded,
+                        title: 'Seçilen gün için randevu yok',
+                        subtitle: 'Takvimden başka bir gün seçebilirsiniz',
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+                        itemCount: _selectedDayAppointments.length,
+                        itemBuilder: (context, index) {
+                          final appt = _selectedDayAppointments[index];
+                          return _buildAppointmentCard(appt);
+                        },
+                      ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppointmentCard(Map<String, dynamic> appt) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Spacing.sm),
+      child: Material(
+        color: context.ct.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AppointmentDetailPage(
+                  appointment: {
+                    'id': appt['id'],
+                    'customer': appt['customer'],
+                    'date': appt['date'] ?? _selectedDay.toIso8601String().substring(0, 10),
+                    'time': appt['time'],
+                    'phone': appt['phone'] ?? '-',
+                    'status': appt['status'] ?? 'pending',
+                    'notes': appt['notes'] ?? '',
+                  },
+                ),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          child: Container(
+            padding: const EdgeInsets.all(Spacing.lg),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: context.ct.surfaceBorder.withAlpha(80)),
+            ),
+            child: Row(
+              children: [
+                AppAvatar(letter: appt['customer'] ?? '?', size: 44, withShadow: false),
+                const SizedBox(width: Spacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        appt['customer'] ?? '',
+                        style: TextStyle(color: context.ct.textPrimary, fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: Spacing.xs),
+                      Row(
+                        children: [
+                          Icon(Icons.access_time_rounded, color: context.ct.textTertiary, size: 14),
+                          const SizedBox(width: Spacing.xs),
+                          Text(appt['time'] ?? '', style: TextStyle(color: context.ct.textSecondary, fontSize: 13)),
+                          const SizedBox(width: Spacing.md),
+                          AppStatusBadge(status: appt['status'] ?? 'pending'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.arrow_forward_ios_rounded, color: context.ct.textHint, size: 16),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

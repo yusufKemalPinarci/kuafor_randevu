@@ -11,7 +11,8 @@ class ShopModel {
   final String closingHour;
   final List<String> workingDays;
   final String ownerId;
-  final List<String> staffEmails;
+  final String? shopCode;
+  final bool autoConfirmAppointments;
 
   ShopModel({
     required this.id,
@@ -26,7 +27,8 @@ class ShopModel {
     required this.closingHour,
     required this.workingDays,
     required this.ownerId,
-    required this.staffEmails,
+    this.shopCode,
+    this.autoConfirmAppointments = false,
   });
 
   factory ShopModel.fromJson(Map<String, dynamic> json) {
@@ -43,7 +45,8 @@ class ShopModel {
       closingHour: json['closingHour'] ?? '',
       workingDays: List<String>.from(json['workingDays'] ?? []),
       ownerId: json['ownerId'] ?? '',
-      staffEmails: List<String>.from(json['staffEmails'] ?? []),
+      shopCode: json['shopCode'] ?? '',
+      autoConfirmAppointments: json['autoConfirmAppointments'] ?? false,
     );
   }
 
@@ -61,7 +64,8 @@ class ShopModel {
       'closingHour': closingHour,
       'workingDays': workingDays,
       'ownerId': ownerId,
-      'staffEmails': staffEmails,
+      'shopCode': shopCode,
+      'autoConfirmAppointments': autoConfirmAppointments,
     };
   }
 }

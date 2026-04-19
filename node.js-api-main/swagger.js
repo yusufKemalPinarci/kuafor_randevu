@@ -8,19 +8,10 @@ const options = {
       title: 'Node.js API Dokümantasyonu',
       version: '1.0.0',
     },
-     servers: [
-            {
-        url: 'https://node-js-api-8m2g.onrender.com',
-        description: 'Render Production Sunucusu',
-      },
+    servers: [
       {
-        url: 'http://localhost:3000',
-        description: 'Local Geliştirme Sunucusu',
-      },
-
-      {
-        url: process.env.SWAGGER_URL, // istersen dinamik olarak .env'den de al
-        description: 'Ortam Değişkeninden Gelen URL',
+        url: process.env.SWAGGER_URL || 'http://localhost:3000',
+        description: process.env.NODE_ENV === 'production' ? 'Production Sunucusu' : 'Local Geliştirme Sunucusu',
       },
     ],
   },

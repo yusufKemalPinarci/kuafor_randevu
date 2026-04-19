@@ -37,7 +37,7 @@ class _SetAvailabilityPageState extends State<SetAvailabilityPage> {
       final end = entry.value['end'];
 
       if (start != null && end != null && start.hour < end.hour) {
-        print("${entry.key}: ${start.format(context)} - ${end.format(context)}");
+        // availability saved
       }
     }
 

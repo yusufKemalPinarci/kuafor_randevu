@@ -1,5 +1,7 @@
 const express = require('express');
 const Service = require('../models/Service');
+const authMiddleware = require('../middlewares/auth');
+const subscriptionMiddleware = require('../middlewares/subscription');
 
 const router = express.Router();
 
@@ -36,9 +38,10 @@ const router = express.Router();
  *         description: Servis başarıyla oluşturuldu
  */
 //yeni servis oluşturmak için berberler kullanır.
-router.post('/', async (req, res) => {
+router.post('/', authMiddleware, subscriptionMiddleware, async (req, res) => {
   try {
-    const service = new Service(req.body);
+    // SECURITY: barberId must match authenticated user
+    const service = new Service({ ...req.body, barberId: req.user._id });
     await service.save();
     res.json(service);
   } catch (err) {
@@ -98,20 +101,23 @@ router.get('/', async (req, res) => {
  *         description: Servis bulunamadı
  */
 // ilgili servisi güncellemek için berberler kullanır
-router.put('/:id', async (req, res) => {
+router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const serviceId = req.params.id;
     const { title, price, durationMinutes } = req.body;
+
+    // SECURITY: Verify ownership before update
+    const existing = await Service.findById(serviceId);
+    if (!existing) return res.status(404).json({ error: 'Service not found' });
+    if (existing.barberId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Bu servisi güncelleme yetkiniz yok.' });
+    }
 
     const updatedService = await Service.findByIdAndUpdate(
       serviceId,
       { title, price, durationMinutes },
       { new: true, runValidators: true }
     );
-
-    if (!updatedService) {
-      return res.status(404).json({ error: 'Service not found' });
-    }
 
     res.json(updatedService);
   } catch (err) {
@@ -147,6 +153,33 @@ router.get('/:barberId/services', async (req, res) => {
   }
 });
 
+
+// Servisi sil
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    // SECURITY: Verify ownership before delete
+    const service = await Service.findById(req.params.id);
+    if (!service) return res.status(404).json({ error: 'Service not found' });
+    if (service.barberId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Bu servisi silme yetkiniz yok.' });
+    }
+
+    // Aktif randevusu varsa silmeyi engelle
+    const Appointment = require('../models/Appointment');
+    const activeCount = await Appointment.countDocuments({
+      serviceId: req.params.id,
+      status: { $in: ['pending', 'confirmed'] }
+    });
+    if (activeCount > 0) {
+      return res.status(400).json({ error: `Bu hizmete ait ${activeCount} aktif randevu bulunuyor. Önce randevuları iptal edin.` });
+    }
+
+    await Service.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Service deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 
 module.exports = router;

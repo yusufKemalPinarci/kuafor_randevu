@@ -29,6 +29,33 @@ const userSchema = new mongoose.Schema({
   availability: [availabilitySchema], // haftalık müsait saatler
   // services: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Service' }], // sunduğu hizmetler
   bio: { type: String, trim: true, default: '' }, // kısa açıklama
+  googleId: { type: String, default: null },
+  firebaseUid: { type: String, default: null, index: true },
+  resetCode: { type: String, default: null },
+  resetCodeExpiry: { type: Date, default: null },
+  fcmTokens: [{ type: String }], // Firebase Cloud Messaging cihaz token'ları
+
+  // Bildirim tercihleri (berberler için)
+  notificationPreferences: {
+    push: { type: Boolean, default: true },
+    email: { type: Boolean, default: false },
+    sms: { type: Boolean, default: false },
+    // Push alt tercihleri
+    pushNewAppointment: { type: Boolean, default: true },
+    pushCancellation: { type: Boolean, default: true },
+    pushReminder: { type: Boolean, default: true },
+    // Email alt tercihleri
+    emailDailySummary: { type: Boolean, default: true },
+    emailReminder: { type: Boolean, default: true },
+    // SMS alt tercihleri
+    smsNewAppointment: { type: Boolean, default: true },
+    smsReminder: { type: Boolean, default: true },
+    // Müşteri bildirim tercihleri
+    customerPushReminder: { type: Boolean, default: true },
+    customerPushStatusChange: { type: Boolean, default: true },
+    customerEmailReminder: { type: Boolean, default: true },
+    customerSmsReminder: { type: Boolean, default: true },
+  },
 }, { timestamps: true });
 
 module.exports = {
